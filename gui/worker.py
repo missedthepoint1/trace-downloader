@@ -158,6 +158,7 @@ class Worker:
         LOG.info("download %s halves=%s acct=%s", game_id, len(masters), acct.id)
         saved = 0
         out_base = acct.output_dir(self._cfg.output_dir)
+        half_files = []
         for half, murl in enumerate(masters, 1):
             if self._cancel.is_set():
                 break
@@ -176,6 +177,19 @@ class Worker:
             finally:
                 self._proc = None
             saved += 1
+            half_files.append(dest)
+        if (self._cfg.combine_halves and not self._cancel.is_set()
+                and len(half_files) == 2):
+            from trace_grabber import combine as _combine
+            from trace_grabber.naming import combined_path
+            out = combined_path(out_base, date or game_id, opponent or None)
+            try:
+                _combine.combine(half_files, out)
+                for h in half_files:
+                    Path(h).unlink(missing_ok=True)
+                LOG.info("combined %s -> %s", game_id, out)
+            except Exception as e:
+                LOG.info("combine failed for %s (keeping halves): %s", game_id, e)
         if saved and not self._cancel.is_set() and len(masters) >= 2:
             mark_done(acct.state_path(DATA), game_id)
         return saved
