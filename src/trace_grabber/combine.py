@@ -13,6 +13,9 @@ def build_concat_cmd(parts, dest, list_file):
 def combine(parts, dest) -> None:
     """Losslessly concatenate the part files into dest (raises on failure)."""
     parts = [Path(p) for p in parts]
+    missing = [str(p) for p in parts if not p.exists()]
+    if missing:
+        raise RuntimeError(f"combine: missing input(s): {missing}")
     dest = Path(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
