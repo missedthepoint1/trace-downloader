@@ -1,4 +1,7 @@
 import shutil
+from pathlib import Path
+
+import platformdirs
 
 from . import paths
 
@@ -8,6 +11,22 @@ _DEFAULT_CONFIG = (
     "quality: highest\n"
     "team_urls: []\n"
 )
+
+def migrate_app_rename() -> None:
+    """Move data from the old 'Trace Downloader' folder into the new 'TraceDown' one."""
+    new = paths.data_dir()
+    if (new / ".migrated").exists() or (new / "accounts.json").exists():
+        return
+    old = Path(platformdirs.user_data_dir("Trace Downloader"))
+    if not old.exists() or old.resolve() == new.resolve():
+        return
+    for item in old.iterdir():
+        dest = new / item.name
+        if not dest.exists():
+            try:
+                shutil.move(str(item), str(dest))
+            except Exception:
+                pass
 
 def ensure_config() -> None:
     cfg = paths.data_dir() / "config.yaml"
@@ -47,5 +66,6 @@ def migrate_dev() -> None:
     (data / ".migrated").write_text("")
 
 def init() -> None:
+    migrate_app_rename()
     migrate_dev()
     ensure_config()

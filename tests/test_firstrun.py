@@ -1,3 +1,27 @@
+def test_migrate_app_rename_moves(monkeypatch, tmp_path):
+    import platformdirs
+    from trace_grabber import firstrun, paths
+    old = tmp_path / "old"; old.mkdir()
+    (old / "accounts.json").write_text('{"active": null, "accounts": []}')
+    (old / ".chrome-profile").mkdir()
+    new = tmp_path / "new"; new.mkdir()
+    monkeypatch.setattr(paths, "data_dir", lambda: new)
+    monkeypatch.setattr(platformdirs, "user_data_dir",
+                        lambda name: str(old) if name == "Trace Downloader" else str(new))
+    firstrun.migrate_app_rename()
+    assert (new / "accounts.json").exists()
+    assert (new / ".chrome-profile").exists()
+
+def test_migrate_app_rename_noop_when_new_has_data(monkeypatch, tmp_path):
+    import platformdirs
+    from trace_grabber import firstrun, paths
+    old = tmp_path / "old"; old.mkdir(); (old / "accounts.json").write_text("x")
+    new = tmp_path / "new"; new.mkdir(); (new / "accounts.json").write_text("keep")
+    monkeypatch.setattr(paths, "data_dir", lambda: new)
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda name: str(old))
+    firstrun.migrate_app_rename()
+    assert (new / "accounts.json").read_text() == "keep"
+
 def test_ensure_config_seeds_when_absent(monkeypatch, tmp_path):
     from trace_grabber import firstrun, paths
     monkeypatch.setattr(paths, "data_dir", lambda: tmp_path / "data")
