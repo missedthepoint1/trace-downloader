@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build "Trace Downloader.app" — a native .app bundle (with icon) that launches
+# Build "TraceDown.app" — a native .app bundle (with icon) that launches
 # the GUI from this repo's venv. It uses the repo's existing data (login,
 # accounts, config), so no re-login. Tied to this Mac's paths by design.
 set -euo pipefail
