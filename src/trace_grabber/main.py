@@ -36,12 +36,25 @@ def _download_game(ctx, page, athlete_getter, headers, cfg, acct, game) -> int:
     masters = streams.resolve_masters(ctx.request, page, athlete_getter, game.team_id, game.id)
     out_base = acct.output_dir(cfg.output_dir)
     saved = 0
+    half_files = []
     for half, murl in enumerate(masters, 1):
         variant = quality.pick_from_master(ctx.request.get(murl, timeout=15000).text(), murl, cfg.quality)
         dest = build_path(out_base, game.date or game.id, half, game.opponent)
         download(variant, dest, headers)
         print(f"saved {dest}")
         saved += 1
+        half_files.append(dest)
+    if cfg.combine_halves and len(half_files) == 2:
+        from . import combine as _combine
+        from .naming import combined_path
+        out = combined_path(out_base, game.date or game.id, game.opponent)
+        try:
+            _combine.combine(half_files, out)
+            for h in half_files:
+                Path(h).unlink(missing_ok=True)
+            print(f"combined -> {out}")
+        except Exception as e:
+            print(f"combine failed (keeping halves): {e}", file=sys.stderr)
     if saved and len(masters) >= 2:
         mark_done(acct.state_path(DATA), game.id)
     return saved
