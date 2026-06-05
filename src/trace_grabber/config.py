@@ -10,6 +10,7 @@ class Config:
     check_interval_hours: int
     quality: str
     team_urls: list[str] = field(default_factory=list)
+    combine_halves: bool = True
 
 def load_config(path: Path) -> Config:
     data = yaml.safe_load(Path(path).read_text())
@@ -19,9 +20,11 @@ def load_config(path: Path) -> Config:
     # team_urls in config is vestigial — accounts.json is the source of truth.
     # It may be empty (fresh install) or absent.
     team_urls = data.get("team_urls") or []
+    combine = bool(data.get("combine_halves", True))
     return Config(
         output_dir=Path(data["output_dir"]).expanduser(),
         check_interval_hours=int(data["check_interval_hours"]),
         quality=quality,
         team_urls=list(team_urls),
+        combine_halves=combine,
     )
