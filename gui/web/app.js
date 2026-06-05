@@ -9,6 +9,7 @@ async function refresh() {
   el("reconnect").style.display = s.logged_in ? "none" : "inline-block";
   el("auto").checked = s.auto;
   if (s.settings) el("quality").value = s.settings.quality;
+  if (s.settings) el("combine").checked = s.settings.combine !== false;
   await renderAccounts();
   const games = await api().list_games();
   renderGames(games);
@@ -164,6 +165,7 @@ el("reconnect").onclick = async () => {
   };
 };
 el("quality").onchange = (e) => api().save_settings({ quality: e.target.value });
+el("combine").onchange = (e) => api().save_settings({ combine: e.target.checked });
 // Run on first ready, and also if the API is already present (e.g. after a
 // page reload from the setup screen, where pywebviewready won't fire again).
 window.addEventListener("pywebviewready", refresh);

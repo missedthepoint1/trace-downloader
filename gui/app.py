@@ -37,7 +37,7 @@ class Api:
             "logged_in": self._w().logged_in(),
             "last_run": last,
             "auto": platform_tasks.schedule_enabled(),
-            "settings": {"output_dir": str(cfg.output_dir), "quality": cfg.quality},
+            "settings": {"output_dir": str(cfg.output_dir), "quality": cfg.quality, "combine": cfg.combine_halves},
         }
 
     def list_games(self):
@@ -131,6 +131,8 @@ class Api:
         data = yaml.safe_load(path.read_text())
         if "quality" in settings:
             data["quality"] = settings["quality"]
+        if "combine" in settings:
+            data["combine_halves"] = bool(settings["combine"])
         path.write_text(yaml.safe_dump(data, sort_keys=False))
         self._w().reload_config()
         return {"ok": True}
