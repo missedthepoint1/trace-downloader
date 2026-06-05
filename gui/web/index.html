@@ -6,7 +6,12 @@
 </head>
 <body>
   <header>
-    <h1>🎥 Trace Downloader</h1>
+    <svg class="logo" width="156" height="26" viewBox="0 0 156 26" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="TraceDown">
+      <polygon points="2,3 2,23 19,13" fill="#3ddc84"/>
+      <text x="27" y="20" font-family="-apple-system,system-ui,sans-serif" font-size="20" font-weight="700">
+        <tspan fill="#e8eef5">Trace</tspan><tspan fill="#3ddc84">Down</tspan>
+      </text>
+    </svg>
     <select id="account" class="account"></select>
     <div id="status" class="status">…</div>
     <button id="reconnect" style="display:none">Reconnect</button>
@@ -27,6 +32,7 @@
     <button id="removeAccount" style="background:#3a2330;color:#e6a">Log out / remove this account</button>
     <menu><button id="closeSettings">Done</button></menu>
   </dialog>
+  <div id="version" class="version"></div>
   <script src="app.js"></script>
 </body>
 </html>

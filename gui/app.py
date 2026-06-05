@@ -38,6 +38,7 @@ class Api:
             "last_run": last,
             "auto": platform_tasks.schedule_enabled(),
             "settings": {"output_dir": str(cfg.output_dir), "quality": cfg.quality, "combine": cfg.combine_halves},
+            "version": paths.APP_VERSION,
         }
 
     def list_games(self):

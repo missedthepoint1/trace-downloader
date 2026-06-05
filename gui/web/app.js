@@ -10,6 +10,7 @@ async function refresh() {
   el("auto").checked = s.auto;
   if (s.settings) el("quality").value = s.settings.quality;
   if (s.settings) el("combine").checked = s.settings.combine !== false;
+  el("version").textContent = "TraceDown v" + (s.version || "");
   await renderAccounts();
   const games = await api().list_games();
   renderGames(games);
