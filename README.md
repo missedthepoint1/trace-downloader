@@ -2,7 +2,12 @@
 
 A personal-use desktop app that downloads your own Trace game videos as 1080p MP4 files, directly to your Mac or Windows PC. You supply your own Trace subscription login — no third-party accounts, no cloud storage.
 
+<p align="center">
+  <img src="assets/screenshot.png" alt="TraceDown app window" width="420">
+</p>
+
 > Unofficial tool, not affiliated with or endorsed by Trace. For use with your own footage and your own Trace subscription.
+> *(Screenshot uses demo data.)*
 
 ---
 
