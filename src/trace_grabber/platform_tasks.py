@@ -73,12 +73,12 @@ def notify(message: str) -> None:
     try:
         if sys.platform == "darwin":
             subprocess.run(["osascript", "-e",
-                f'display notification "{message}" with title "Trace Downloader"'],
+                f'display notification "{message}" with title "TraceDown"'],
                 check=False)
         elif os.name == "nt":
             safe = message.replace("'", "")
             subprocess.run(["powershell", "-NoProfile", "-Command",
-                f"New-BurntToastNotification -Text 'Trace Downloader','{safe}'"],
+                f"New-BurntToastNotification -Text 'TraceDown','{safe}'"],
                 check=False)
     except Exception:
         pass

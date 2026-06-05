@@ -149,7 +149,7 @@ def main():
     api = Api()
     need_setup = not tools.chromium_installed()
     first = WEB / ("setup.html" if need_setup else "index.html")
-    window = webview.create_window("Trace Downloader", str(first), js_api=api,
+    window = webview.create_window("TraceDown", str(first), js_api=api,
                                    width=520, height=720)
     api.set_window(window)
     if need_setup:
