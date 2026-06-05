@@ -39,13 +39,13 @@ a = Analysis(
 pyz = PYZ(a.pure)
 exe = EXE(
     pyz, a.scripts, [], exclude_binaries=True,
-    name="Trace Downloader", console=False, icon=icon_file,
+    name="TraceDown", console=False, icon=icon_file,
 )
-coll = COLLECT(exe, a.binaries, a.datas, name="Trace Downloader")
+coll = COLLECT(exe, a.binaries, a.datas, name="TraceDown")
 
 if sys.platform == "darwin":
     app = BUNDLE(
-        coll, name="Trace Downloader.app",
+        coll, name="TraceDown.app",
         icon=os.path.join(ROOT, "assets", "icon.icns"),
         bundle_identifier="com.tracedownloader.app",
         info_plist={"NSHighResolutionCapable": True, "LSMinimumSystemVersion": "11.0"},

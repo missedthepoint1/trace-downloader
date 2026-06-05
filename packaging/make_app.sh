@@ -5,7 +5,7 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-APP="$REPO/dist/Trace Downloader.app"
+APP="$REPO/dist/TraceDown.app"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
@@ -15,8 +15,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleName</key><string>Trace Downloader</string>
-  <key>CFBundleDisplayName</key><string>Trace Downloader</string>
+  <key>CFBundleName</key><string>TraceDown</string>
+  <key>CFBundleDisplayName</key><string>TraceDown</string>
   <key>CFBundleIdentifier</key><string>com.tracegrabber.app</string>
   <key>CFBundleVersion</key><string>1.0</string>
   <key>CFBundleShortVersionString</key><string>1.0</string>

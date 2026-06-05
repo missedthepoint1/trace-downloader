@@ -29,17 +29,17 @@ jobs:
         run: pyinstaller --noconfirm packaging/TraceDownloader.spec
       - name: Zip (macOS)
         if: runner.os == 'macOS'
-        run: cd dist && zip -ry ../TraceDownloader-macOS.zip "Trace Downloader.app"
+        run: cd dist && zip -ry ../TraceDown-macOS.zip "TraceDown.app"
       - name: Zip (Windows)
         if: runner.os == 'Windows'
-        run: Compress-Archive -Path "dist/Trace Downloader/*" -DestinationPath TraceDownloader-Windows.zip
+        run: Compress-Archive -Path "dist/TraceDown/*" -DestinationPath TraceDown-Windows.zip
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: TraceDownloader-${{ runner.os }}
-          path: TraceDownloader-*.zip
+          path: TraceDown-*.zip
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: TraceDownloader-*.zip
+          files: TraceDown-*.zip
