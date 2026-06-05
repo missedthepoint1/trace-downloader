@@ -28,7 +28,13 @@ def _iso_date(text: str) -> str:
     m = _DATE_HEAD.match(text.strip())
     if not m:
         return ""
-    return datetime.strptime(m.group(1), "%b %d, %Y").strftime("%Y-%m-%d")
+    # Trace uses full month names ("June 4, 2026"); accept abbreviated too.
+    for fmt in ("%B %d, %Y", "%b %d, %Y"):
+        try:
+            return datetime.strptime(m.group(1), fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+    return ""
 
 def parse_games(page_html: str) -> list[Game]:
     games: list[Game] = []
@@ -41,11 +47,14 @@ def parse_games(page_html: str) -> list[Game]:
         if gid in seen:
             continue
         seen.add(gid)
-        tm = _TITLE_RE.search(block)
-        title = _html.unescape(tm.group(1).strip()) if tm else ""
-        dm = _DATE_RE.search(block)
-        date = _iso_date(_html.unescape(dm.group(1))) if dm else ""
-        opponent = title.split(" vs. ", 1)[1].strip() if " vs. " in title else None
+        try:
+            tm = _TITLE_RE.search(block)
+            title = _html.unescape(tm.group(1).strip()) if tm else ""
+            dm = _DATE_RE.search(block)
+            date = _iso_date(_html.unescape(dm.group(1))) if dm else ""
+            opponent = title.split(" vs. ", 1)[1].strip() if " vs. " in title else None
+        except Exception:
+            title, date, opponent = "", "", None  # never let one card blank the list
         games.append(Game(id=gid, team_id=team_id, date=date, opponent=opponent, title=title))
     return games
 

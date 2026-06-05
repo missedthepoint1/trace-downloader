@@ -19,6 +19,13 @@ def test_opponent_parsed_for_each():
     opps = [g.opponent for g in parse_games(FIXTURE.read_text())]
     assert opps == ["Rovers", "United", "Athletic"]
 
+def test_full_month_name_dates():
+    # Trace shows full month names; "June" must not crash (only "May" is 3 letters).
+    from trace_grabber.games import _iso_date
+    assert _iso_date("June 4, 2026 @ 7:30 pm") == "2026-06-04"
+    assert _iso_date("August 12, 2026") == "2026-08-12"
+    assert _iso_date("May 28, 2026") == "2026-05-28"
+
 def test_no_duplicate_ids():
     games = parse_games(FIXTURE.read_text())
     assert len(games) == len({g.id for g in games})
