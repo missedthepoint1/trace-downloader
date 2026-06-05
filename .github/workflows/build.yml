@@ -1,0 +1,42 @@
+name: build
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install deps
+        run: pip install -e ".[dev]"
+      - name: Icons
+        run: python assets/make_icon.py
+      - name: Fetch ffmpeg
+        run: python packaging/fetch_ffmpeg.py
+      - name: Build
+        run: pyinstaller --noconfirm packaging/TraceDownloader.spec
+      - name: Zip (macOS)
+        if: runner.os == 'macOS'
+        run: cd dist && zip -ry ../TraceDownloader-macOS.zip "Trace Downloader.app"
+      - name: Zip (Windows)
+        if: runner.os == 'Windows'
+        run: Compress-Archive -Path "dist/Trace Downloader/*" -DestinationPath TraceDownloader-Windows.zip
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TraceDownloader-${{ runner.os }}
+          path: TraceDownloader-*.zip
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: TraceDownloader-*.zip

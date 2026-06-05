@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>🎥 Trace Downloader</h1>
+    <select id="account" class="account"></select>
+    <div id="status" class="status">…</div>
+    <button id="reconnect" style="display:none">Reconnect</button>
+  </header>
+  <button id="downloadAll" class="primary">⬇ Download all new games</button>
+  <div id="games" class="games"></div>
+  <footer>
+    <button id="openFolder">📁 Open folder</button>
+    <button id="settingsBtn">⚙ Settings</button>
+  </footer>
+  <dialog id="settings">
+    <h2>Settings</h2>
+    <label>Quality
+      <select id="quality"><option>highest</option><option>2000k</option><option>1000k</option></select>
+    </label>
+    <label class="switch"><input type="checkbox" id="auto"> Download new games automatically every 3 hours</label>
+    <button id="removeAccount" style="background:#3a2330;color:#e6a">Log out / remove this account</button>
+    <menu><button id="closeSettings">Done</button></menu>
+  </dialog>
+  <script src="app.js"></script>
+</body>
+</html>

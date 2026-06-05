@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.tracegrabber</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/zaksmith/Documents/CODE/TRACE/.venv/bin/python3</string>
+        <string>-m</string>
+        <string>trace_grabber.main</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/zaksmith/Documents/CODE/TRACE</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PYTHONPATH</key>
+        <string>/Users/zaksmith/Documents/CODE/TRACE/src</string>
+    </dict>
+
+    <key>StartInterval</key>
+    <integer>10800</integer>
+
+    <key>StandardOutPath</key>
+    <string>/Users/zaksmith/Documents/CODE/TRACE/debug/launchd.out.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/zaksmith/Documents/CODE/TRACE/debug/launchd.err.log</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>

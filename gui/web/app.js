@@ -1,0 +1,170 @@
+const api = () => window.pywebview.api;
+const el = (id) => document.getElementById(id);
+
+async function refresh() {
+  const s = await api().get_status();
+  const st = el("status");
+  st.textContent = s.logged_in ? "Logged in" : "Session expired";
+  st.className = "status " + (s.logged_in ? "ok" : "bad");
+  el("reconnect").style.display = s.logged_in ? "none" : "inline-block";
+  el("auto").checked = s.auto;
+  if (s.settings) el("quality").value = s.settings.quality;
+  await renderAccounts();
+  const games = await api().list_games();
+  renderGames(games);
+}
+
+async function renderAccounts() {
+  const data = await api().list_accounts();
+  const sel = el("account");
+  sel.innerHTML = "";
+  for (const a of data.accounts) {
+    const o = document.createElement("option");
+    o.value = a.id; o.textContent = a.label;
+    if (a.id === data.active) o.selected = true;
+    sel.appendChild(o);
+  }
+  const add = document.createElement("option");
+  add.value = "__add__"; add.textContent = "+ Add account…";
+  sel.appendChild(add);
+}
+
+function renderGames(games) {
+  const box = el("games");
+  box.innerHTML = "";
+  for (const g of games) {
+    const div = document.createElement("div");
+    div.className = "game"; div.id = "g-" + g.id;
+    div.innerHTML = `
+      <div class="thumb"></div>
+      <div class="meta">
+        <div class="date">${g.date}</div>
+        <div class="opp">vs ${g.opponent || g.title}</div>
+        <div class="bar" style="display:none"><i></i></div>
+        <div class="speed"></div>
+      </div>
+      <div class="action"></div>`;
+    const action = div.querySelector(".action");
+    if (g.state === "saved") {
+      action.innerHTML = `<span class="saved">✓ Saved</span>`;
+    } else {
+      setDownloadBtn(action, g.id);
+    }
+    box.appendChild(div);
+    loadThumb(div, g);
+  }
+}
+
+function loadThumb(div, g) {
+  if (!g.team_id) return;
+  api().get_thumb(g.team_id, g.id).then((url) => {
+    if (url) {
+      const t = div.querySelector(".thumb");
+      t.style.backgroundImage = `url("${url}")`;
+      t.style.backgroundSize = "cover";
+      t.style.backgroundPosition = "center";
+    }
+  }).catch(() => {});
+}
+
+function showBar(id) { const g = el("g-" + id); if (g) g.querySelector(".bar").style.display = "block"; }
+
+function setDownloadBtn(action, id) {
+  action.innerHTML = "";
+  const b = document.createElement("button");
+  b.textContent = "Download";
+  b.onclick = () => startDownload(id);
+  action.appendChild(b);
+}
+function setCancelBtn(action, id) {
+  action.innerHTML = "";
+  const b = document.createElement("button");
+  b.textContent = "Cancel";
+  b.style.background = "#3a2330"; b.style.color = "#f0a0b8";
+  b.onclick = () => { b.disabled = true; b.textContent = "Cancelling…"; api().cancel(); };
+  action.appendChild(b);
+}
+function startDownload(id) {
+  const g = el("g-" + id);
+  if (!g) return;
+  showBar(id);
+  setCancelBtn(g.querySelector(".action"), id);
+  api().download_game(id);
+}
+
+window.onPy = (event, p) => {
+  const g = el("g-" + p.id);
+  if (!g) return;
+  if (event === "progress") {
+    showBar(p.id);
+    g.querySelector(".bar > i").style.width = p.percent + "%";
+    g.querySelector(".speed").textContent = `Half ${p.half} · ${p.speed} MB/s`;
+    const action = g.querySelector(".action");
+    const btn = action.querySelector("button");
+    if (!btn || btn.textContent === "Download") setCancelBtn(action, p.id);
+  } else if (event === "cancelled") {
+    g.querySelector(".bar").style.display = "none";
+    g.querySelector(".bar > i").style.width = "0%";
+    g.querySelector(".speed").textContent = "";
+    setDownloadBtn(g.querySelector(".action"), p.id);
+  } else if (event === "saved") {
+    g.querySelector(".bar").style.display = "none";
+    g.querySelector(".speed").textContent = "";
+    g.querySelector(".action").innerHTML = `<span class="saved">✓ Saved</span>`;
+  } else if (event === "unavailable") {
+    g.querySelector(".bar").style.display = "none";
+    g.querySelector(".speed").textContent = "";
+    g.querySelector(".action").innerHTML = `<span style="color:#8aa0b4">No video</span>`;
+  } else if (event === "error") {
+    g.querySelector(".bar").style.display = "none";
+    g.querySelector(".speed").textContent = "";
+    g.querySelector(".action").innerHTML = `<span style="color:#e0a33e" title="${(p.message||'').replace(/"/g,'')}">Failed</span>`;
+  }
+};
+
+el("account").onchange = async (e) => {
+  const v = e.target.value;
+  if (v === "__add__") { await addAccountFlow(); await refresh(); return; }
+  await api().switch_account(v);
+  await refresh();
+};
+
+async function addAccountFlow() {
+  await api().add_account_start();
+  alert("A browser opened. Log into the OTHER Trace account (email + phone code), open your games, then click OK here.");
+  let res = await api().add_account_finish();
+  if (res && res.needs_url) {
+    const url = prompt("Couldn't auto-detect the team. Paste your team page URL (from go.traceup.com):", "https://go.traceup.com/traceid/team/");
+    if (url) await api().confirm_team_url(url);
+  }
+}
+
+el("downloadAll").onclick = () => api().download_new();
+el("openFolder").onclick = () => api().open_folder();
+el("settingsBtn").onclick = () => el("settings").showModal();
+el("closeSettings").onclick = () => el("settings").close();
+el("auto").onchange = (e) => api().set_auto(e.target.checked);
+el("removeAccount").onclick = async () => {
+  const sel = el("account");
+  const label = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : "this account";
+  if (confirm(`Log out and remove "${label}"? Its saved login and history will be deleted.`)) {
+    await api().remove_account(sel.value);
+    el("settings").close();
+    await refresh();
+  }
+};
+el("reconnect").onclick = async () => {
+  await api().reconnect_start();
+  const b = el("reconnect");
+  b.textContent = "I've logged in →";
+  b.onclick = async () => {
+    b.disabled = true; b.textContent = "Checking…";
+    await api().reconnect_finish();
+    b.disabled = false; await refresh(); b.textContent = "Reconnect";
+  };
+};
+el("quality").onchange = (e) => api().save_settings({ quality: e.target.value });
+// Run on first ready, and also if the API is already present (e.g. after a
+// page reload from the setup screen, where pywebviewready won't fire again).
+window.addEventListener("pywebviewready", refresh);
+if (window.pywebview && window.pywebview.api) refresh();

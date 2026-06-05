@@ -1,0 +1,317 @@
+import logging
+import queue
+import threading
+import time
+from concurrent.futures import Future
+from pathlib import Path
+
+from playwright.sync_api import sync_playwright
+
+from trace_grabber.config import load_config
+from trace_grabber import accounts as accts_mod
+from trace_grabber import paths
+from trace_grabber.session import is_logged_in, cookie_headers
+from trace_grabber.games import list_games, parse_games
+from trace_grabber import streams, quality
+from trace_grabber.download import download
+from trace_grabber.naming import build_path
+from trace_grabber.state import load_state, mark_done
+from trace_grabber.progress import playlist_duration
+from trace_grabber.selectors import BASE_URL
+
+DATA = paths.data_dir()
+(DATA / "debug").mkdir(exist_ok=True)
+logging.basicConfig(filename=str(DATA / "debug" / "gui.log"), level=logging.INFO,
+                    format="%(asctime)s %(message)s")
+LOG = logging.getLogger("trace_gui")
+
+class Worker:
+    """All Playwright/ffmpeg work on one dedicated thread, for the active account."""
+
+    def __init__(self):
+        self._jobs: queue.Queue = queue.Queue()
+        self._cancel = threading.Event()
+        self._proc = None
+        self._athlete_id = None
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._started = threading.Event()
+        self._thread.start()
+        self._started.wait()
+
+    # cancel control — these run on the CALLER's thread (not the job queue),
+    # because the worker thread is blocked inside the running download.
+    def clear_cancel(self):
+        self._cancel.clear()
+
+    def cancelled(self):
+        return self._cancel.is_set()
+
+    def cancel(self):
+        self._cancel.set()
+        p = self._proc
+        if p is not None:
+            try:
+                p.terminate()
+            except Exception:
+                pass
+
+    def submit(self, fn):
+        fut: Future = Future()
+        self._jobs.put((fn, fut))
+        return fut.result()
+
+    # ---- public API ----
+    def logged_in(self):
+        return self.submit(lambda: self._logged_in())
+
+    def list_games(self):
+        return self.submit(lambda: self._list_games())
+
+    def download_game(self, game_id, team_id, date, opponent, on_progress):
+        return self.submit(lambda: self._download_game(game_id, team_id, date, opponent, on_progress))
+
+    def get_thumb(self, team_id, game_id):
+        return self.submit(lambda: self._get_thumb(team_id, game_id))
+
+    def list_accounts(self):
+        return self.submit(lambda: self._list_accounts())
+
+    def switch_account(self, account_id):
+        return self.submit(lambda: self._switch_account(account_id))
+
+    def remove_account(self, account_id):
+        return self.submit(lambda: self._remove_account(account_id))
+
+    def add_account_start(self):
+        return self.submit(lambda: self._add_account_start())
+
+    def add_account_finish(self):
+        return self.submit(lambda: self._add_account_finish())
+
+    def confirm_team_url(self, url):
+        return self.submit(lambda: self._confirm_team_url(url))
+
+    def reconnect_start(self):
+        return self.submit(lambda: self._reconnect_start())
+
+    def reconnect_finish(self):
+        return self.submit(lambda: self._reconnect_finish())
+
+    def reload_config(self):
+        return self.submit(lambda: self._reload_config())
+
+    # ---- thread internals ----
+
+    def _open_ctx(self, profile_dir: str, headless: bool):
+        self._ctx = self._pw.chromium.launch_persistent_context(
+            str(DATA / profile_dir), headless=headless)
+        self._page = self._ctx.pages[0] if self._ctx.pages else self._ctx.new_page()
+
+    def _open_active(self):
+        self._accounts = accts_mod.load_accounts(DATA)
+        acct = self._accounts.active
+        if acct:
+            self._open_ctx(acct.profile_dir, headless=True)
+        else:
+            self._open_ctx("profiles/_empty", headless=True)
+
+    def _run(self):
+        with sync_playwright() as p:
+            self._pw = p
+            self._cfg = load_config(DATA / "config.yaml")
+            self._open_active()
+            self._started.set()
+            while True:
+                fn, fut = self._jobs.get()
+                if fn is None:
+                    break
+                try:
+                    fut.set_result(fn())
+                except Exception as e:  # noqa
+                    LOG.exception("job failed")
+                    fut.set_exception(e)
+
+    def _active(self):
+        return self._accounts.active
+
+    def _logged_in(self):
+        acct = self._active()
+        if not acct or not acct.team_urls:
+            return False
+        return is_logged_in(self._page, acct.team_urls[0])
+
+    def _list_games(self):
+        acct = self._active()
+        out = []
+        for url in (acct.team_urls if acct else []):
+            out.extend(list_games(self._page, url))
+        # auto-name a freshly-migrated account from its games
+        if acct and acct.label.startswith("Account ") and out and " vs. " in out[0].title:
+            acct.label = out[0].title.split(" vs. ", 1)[0].strip()
+            accts_mod.save_accounts(DATA, self._accounts)
+        return out, load_state(acct.state_path(DATA)) if acct else set()
+
+    def _download_game(self, game_id, team_id, date, opponent, on_progress):
+        acct = self._active()
+        headers = cookie_headers(self._ctx)
+        masters = self._resolve_masters(team_id, game_id)
+        LOG.info("download %s halves=%s acct=%s", game_id, len(masters), acct.id)
+        saved = 0
+        out_base = acct.output_dir(self._cfg.output_dir)
+        for half, murl in enumerate(masters, 1):
+            if self._cancel.is_set():
+                break
+            variant = quality.pick_from_master(self._ctx.request.get(murl).text(), murl, self._cfg.quality)
+            dur = playlist_duration(self._ctx.request.get(variant).text())
+            dest = build_path(out_base, date or game_id, half, opponent or None)
+            try:
+                download(variant, dest, headers,
+                         progress_cb=lambda pct, mbps, h=half: on_progress(h, pct, mbps),
+                         duration=dur, on_proc=lambda pr: setattr(self, "_proc", pr))
+            except RuntimeError:
+                if self._cancel.is_set():
+                    Path(dest).unlink(missing_ok=True)  # remove the partial file
+                    break
+                raise
+            finally:
+                self._proc = None
+            saved += 1
+        if saved and not self._cancel.is_set() and len(masters) >= 2:
+            mark_done(acct.state_path(DATA), game_id)
+        return saved
+
+    def _resolve_masters(self, team_id, game_id):
+        """Known prefixes first; watch-page fallback for any new path variant."""
+        return streams.resolve_masters(self._ctx.request, self._page, self._athlete,
+                                       team_id, game_id)
+
+    def _athlete(self):
+        """Discover the logged-in athlete id once (cached for the session)."""
+        if not self._athlete_id:
+            acct = self._active()
+            if acct and acct.team_urls:
+                self._athlete_id = streams.discover_athlete(self._page, acct.team_urls[0])
+        return self._athlete_id
+
+    def _get_thumb(self, team_id, game_id):
+        """Fetch the game's poster with the session and return a data: URL (or None).
+
+        Tries both URL prefixes (newer 'api', older 'us-east-2/soccer/api').
+        """
+        import base64
+        for prefix in streams.PREFIXES:
+            url = f"{BASE_URL}/{prefix}/teams/{team_id}/games/{game_id}/poster.jpg"
+            try:
+                r = self._ctx.request.get(url, timeout=12000)
+                if r.ok:
+                    b64 = base64.b64encode(r.body()).decode("ascii")
+                    return f"data:image/jpeg;base64,{b64}"
+            except Exception:
+                continue
+        return None
+
+    def _list_accounts(self):
+        self._accounts = accts_mod.load_accounts(DATA)
+        return {"active": self._accounts.active_id,
+                "accounts": [{"id": a.id, "label": a.label} for a in self._accounts.items]}
+
+    def _switch_account(self, account_id):
+        self._ctx.close()
+        accts_mod.set_active(DATA, self._accounts, account_id)
+        self._open_active()
+        return self._list_accounts()
+
+    def _remove_account(self, account_id):
+        was_active = self._accounts.active_id == account_id
+        if was_active:
+            self._ctx.close()
+        accts_mod.remove_account(DATA, self._accounts, account_id)
+        if was_active:
+            self._open_active()
+        return self._list_accounts()
+
+    # ---- add-account flow (headed) ----
+    def _add_account_start(self):
+        self._ctx.close()
+        self._pending_profile = f"profiles/pending-{int(time.monotonic()*1000)}"
+        self._open_ctx(self._pending_profile, headless=False)
+        self._page.goto("https://traceup.com", wait_until="domcontentloaded")
+        return True
+
+    def _detect_teams(self):
+        """Return list of (team_url, label). Scrapes /traceid/team/<id> links."""
+        import re
+        html = self._page.content()
+        ids = []
+        for m in re.findall(r'href="(/traceid/team/[a-z0-9]+)"', html):
+            if m not in ids:
+                ids.append(m)
+        teams = []
+        for path in ids:
+            url = BASE_URL + path
+            self._page.goto(url, wait_until="domcontentloaded")
+            try:
+                self._page.wait_for_selector("a.GameLink.GameCard, h1", timeout=10000)
+            except Exception:
+                pass
+            games = parse_games(self._page.content())
+            label = games[0].title.split(" vs. ", 1)[0].strip() if games and " vs. " in games[0].title else None
+            if not label:
+                h1 = self._page.query_selector("h1")
+                label = h1.inner_text().strip() if h1 else "Account"
+            teams.append((url, label))
+        return teams
+
+    def _finalize(self, team_urls, label):
+        # move pending profile to a stable per-id dir
+        acct_id = accts_mod.slugify(label) or f"account-{len(self._accounts.items)+1}"
+        stable = f"profiles/{acct_id}"
+        self._ctx.close()
+        src = DATA / self._pending_profile
+        dst = DATA / stable
+        if src.exists():
+            src.replace(dst)
+        accts_mod.add_account(DATA, self._accounts, label=label,
+                              team_urls=team_urls, profile_dir=stable)
+        self._open_active()
+        return self._list_accounts()
+
+    def _add_account_finish(self):
+        teams = self._detect_teams()
+        if not teams:
+            return {"needs_url": True}
+        team_urls = [u for u, _ in teams]
+        label = teams[0][1]
+        return self._finalize(team_urls, label)
+
+    def _confirm_team_url(self, url):
+        url = url.strip().rstrip("/")
+        self._page.goto(url, wait_until="domcontentloaded")
+        try:
+            self._page.wait_for_selector("a.GameLink.GameCard, h1", timeout=12000)
+        except Exception:
+            pass
+        games = parse_games(self._page.content())
+        label = (games[0].title.split(" vs. ", 1)[0].strip()
+                 if games and " vs. " in games[0].title else "Account")
+        return self._finalize([url], label)
+
+    # ---- reconnect flow (kept for compatibility) ----
+    def _reconnect_start(self):
+        self._ctx.close()
+        self._open_ctx(self._accounts.active.profile_dir if self._accounts.active else ".chrome-profile",
+                       headless=False)
+        self._page.goto("https://traceup.com", wait_until="domcontentloaded")
+        return True
+
+    def _reconnect_finish(self):
+        acct = self._active()
+        self._ctx.close()
+        self._open_ctx(acct.profile_dir if acct else ".chrome-profile", headless=True)
+        if not acct or not acct.team_urls:
+            return False
+        return is_logged_in(self._page, acct.team_urls[0])
+
+    def _reload_config(self):
+        self._cfg = load_config(DATA / "config.yaml")
+        return True

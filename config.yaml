@@ -1,0 +1,4 @@
+output_dir: ~/Trace Videos
+check_interval_hours: 3
+quality: highest   # highest | 2000k | 1000k
+team_urls: []      # filled per-user by adding an account in the app
