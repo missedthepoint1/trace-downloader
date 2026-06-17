@@ -15,7 +15,8 @@ A personal-use desktop app that downloads your own Trace game videos as 1080p MP
 
 Go to the [**Releases**](../../releases/latest) page and download the zip for your platform:
 
-- `TraceDown-macOS.zip` — Mac (Apple Silicon + Intel)
+- `TraceDown-macOS-AppleSilicon.zip` — Mac (Apple Silicon: M1/M2/M3/M4)
+- `TraceDown-macOS-Intel.zip` — Mac (Intel)
 - `TraceDown-Windows.zip` — Windows (x64)
 
 ---
@@ -24,9 +25,9 @@ Go to the [**Releases**](../../releases/latest) page and download the zip for yo
 
 ### macOS
 
-1. Unzip `TraceDown-macOS.zip`.
+1. Unzip the download for your Mac (**Apple Silicon** for M1/M2/M3/M4, **Intel** otherwise — click  → *About This Mac* if unsure).
 2. Drag **TraceDown** into your **Applications** folder.
-3. First open: right-click the app → **Open** → click **Open** on the warning dialog (one-time unsigned-app prompt).
+3. Double-click to open. The app is signed with a Developer ID and notarized by Apple, so it opens normally — no security workaround needed.
 
 ### Windows
 
@@ -38,7 +39,7 @@ Go to the [**Releases**](../../releases/latest) page and download the zip for yo
 
 ## First Launch
 
-On first launch the app downloads the video engine (~170 MB, one time). Once that completes:
+On **macOS**, the first launch downloads the video engine (Chromium, ~170 MB, one time) — the **Windows** build already includes it. Once ready:
 
 1. Click **+ Add account**.
 2. Log in with your Trace email address and the phone verification code.
