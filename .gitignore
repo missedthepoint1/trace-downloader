@@ -11,6 +11,7 @@ debug/
 dist/
 build/
 bin/
+ms-playwright/
 *.egg-info/
 .DS_Store
 probe_*.py
