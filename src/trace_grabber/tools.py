@@ -6,6 +6,17 @@ from pathlib import Path
 
 from . import paths
 
+def subprocess_flags() -> dict:
+    """Kwargs to keep child processes from popping a console window on Windows.
+
+    The frozen app is windowed (console=False); launching a console child
+    (node/ffmpeg) without this would allocate a visible console window.
+    CREATE_NO_WINDOW exists only on Windows, so it is referenced only there.
+    """
+    if os.name == "nt":
+        return {"creationflags": subprocess.CREATE_NO_WINDOW}
+    return {}
+
 def _ffmpeg_name() -> str:
     return "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
 
