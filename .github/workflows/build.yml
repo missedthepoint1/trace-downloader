@@ -81,10 +81,18 @@ jobs:
           echo "$NOTARY_KEY_BASE64" | base64 --decode > "$RUNNER_TEMP/notary.p8"
           # notarytool wants a zip of the .app; staple writes the ticket back into the .app.
           ditto -c -k --keepParent "dist/TraceDown.app" "$RUNNER_TEMP/notarize.zip"
-          xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" \
-            --key "$RUNNER_TEMP/notary.p8" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" --wait
-          xcrun stapler staple "dist/TraceDown.app"
+          SUBMIT_JSON=$(xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" \
+            --key "$RUNNER_TEMP/notary.p8" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" \
+            --wait --output-format json)
+          echo "$SUBMIT_JSON"
+          SUBMIT_ID=$(echo "$SUBMIT_JSON" | python3 -c "import sys,json;print(json.load(sys.stdin)['id'])")
+          STATUS=$(echo "$SUBMIT_JSON" | python3 -c "import sys,json;print(json.load(sys.stdin)['status'])")
+          echo "=== notarytool log for $SUBMIT_ID ==="
+          xcrun notarytool log "$SUBMIT_ID" \
+            --key "$RUNNER_TEMP/notary.p8" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" || true
           rm "$RUNNER_TEMP/notary.p8"
+          if [ "$STATUS" != "Accepted" ]; then echo "Notarization status: $STATUS"; exit 1; fi
+          xcrun stapler staple "dist/TraceDown.app"
 
       - name: Zip (macOS)
         if: runner.os == 'macOS'
