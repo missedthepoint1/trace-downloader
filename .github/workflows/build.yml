@@ -63,12 +63,29 @@ jobs:
           rm "$RUNNER_TEMP/cert.p12"
 
       - name: Build
-        # CODESIGN_IDENTITY / ENTITLEMENTS are read by the .spec (macOS BUNDLE only).
-        # On Windows they are empty and ignored.
+        run: pyinstaller --noconfirm packaging/TraceDownloader.spec
+
+      - name: Codesign (macOS)
+        if: runner.os == 'macOS'
         env:
           CODESIGN_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
-          ENTITLEMENTS: packaging/entitlements.plist
-        run: pyinstaller --noconfirm packaging/TraceDownloader.spec
+        run: |
+          set -euo pipefail
+          APP="dist/TraceDown.app"
+          ENT="packaging/entitlements.plist"
+          # PyInstaller's own signing left binaries ad-hoc / no-timestamp / no
+          # hardened runtime (notarization rejected them). Sign every Mach-O
+          # (dylibs, .so, bundled ffmpeg + node driver, the main exe) with a
+          # secure timestamp and hardened runtime, then seal the bundle with
+          # the entitlements (applied to the main executable).
+          while IFS= read -r f; do
+            if file "$f" | grep -q "Mach-O"; then
+              codesign --force --timestamp --options runtime -s "$CODESIGN_IDENTITY" "$f"
+            fi
+          done < <(find "$APP" -type f)
+          codesign --force --timestamp --options runtime \
+            --entitlements "$ENT" -s "$CODESIGN_IDENTITY" "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
 
       - name: Notarize & staple (macOS)
         if: runner.os == 'macOS'
