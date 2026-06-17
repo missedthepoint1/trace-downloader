@@ -48,9 +48,14 @@ exe = EXE(
 coll = COLLECT(exe, a.binaries, a.datas, name="TraceDown")
 
 if sys.platform == "darwin":
+    # Set in CI for signed/notarized release builds; unset locally (no signing).
+    codesign_identity = os.environ.get("CODESIGN_IDENTITY") or None
+    entitlements = os.environ.get("ENTITLEMENTS") or None
     app = BUNDLE(
         coll, name="TraceDown.app",
         icon=os.path.join(ROOT, "assets", "icon.icns"),
         bundle_identifier="com.tracedownloader.app",
         info_plist={"NSHighResolutionCapable": True, "LSMinimumSystemVersion": "11.0"},
+        codesign_identity=codesign_identity,
+        entitlements_file=entitlements,
     )

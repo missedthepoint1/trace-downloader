@@ -12,7 +12,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest]
+        include:
+          - os: macos-14        # Apple Silicon (arm64)
+            label: macOS-AppleSilicon
+          - os: macos-13        # Intel (x86_64)
+            label: macOS-Intel
+          - os: windows-latest
+            label: Windows
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -36,18 +42,61 @@ jobs:
         env:
           PLAYWRIGHT_BROWSERS_PATH: ms-playwright
         run: python -m playwright install chromium
+
+      # --- macOS code signing: import the Developer ID cert into a temp keychain ---
+      - name: Import signing certificate (macOS)
+        if: runner.os == 'macOS'
+        env:
+          CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/build.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 24)"
+          echo "$CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" "$(security default-keychain -d user | tr -d ' \"')"
+          rm "$RUNNER_TEMP/cert.p12"
+
       - name: Build
+        # CODESIGN_IDENTITY / ENTITLEMENTS are read by the .spec (macOS BUNDLE only).
+        # On Windows they are empty and ignored.
+        env:
+          CODESIGN_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
+          ENTITLEMENTS: packaging/entitlements.plist
         run: pyinstaller --noconfirm packaging/TraceDownloader.spec
+
+      - name: Notarize & staple (macOS)
+        if: runner.os == 'macOS'
+        env:
+          NOTARY_KEY_BASE64: ${{ secrets.MACOS_NOTARY_KEY_BASE64 }}
+          NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          echo "$NOTARY_KEY_BASE64" | base64 --decode > "$RUNNER_TEMP/notary.p8"
+          # notarytool wants a zip of the .app; staple writes the ticket back into the .app.
+          ditto -c -k --keepParent "dist/TraceDown.app" "$RUNNER_TEMP/notarize.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" \
+            --key "$RUNNER_TEMP/notary.p8" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" --wait
+          xcrun stapler staple "dist/TraceDown.app"
+          rm "$RUNNER_TEMP/notary.p8"
+
       - name: Zip (macOS)
         if: runner.os == 'macOS'
-        run: cd dist && zip -ry ../TraceDown-macOS.zip "TraceDown.app"
+        # ditto preserves the signature + stapled notarization ticket inside the zip.
+        run: cd dist && ditto -c -k --keepParent "TraceDown.app" "../TraceDown-${{ matrix.label }}.zip"
       - name: Zip (Windows)
         if: runner.os == 'Windows'
         run: Compress-Archive -Path "dist/TraceDown/*" -DestinationPath TraceDown-Windows.zip
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TraceDownloader-${{ runner.os }}
+          name: TraceDownloader-${{ matrix.label }}
           path: TraceDown-*.zip
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/')
