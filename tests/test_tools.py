@@ -23,3 +23,32 @@ def test_subprocess_flags_non_windows(monkeypatch):
     from trace_grabber import tools
     monkeypatch.setattr(tools.os, "name", "posix")
     assert tools.subprocess_flags() == {}
+
+def test_setup_browser_env_prefers_bundled(monkeypatch, tmp_path):
+    import os
+    from trace_grabber import tools, paths
+    (tmp_path / "ms-playwright").mkdir()
+    monkeypatch.setattr(paths, "is_frozen", lambda: True)
+    monkeypatch.setattr(paths, "resource_dir", lambda: tmp_path)
+    monkeypatch.delenv("PLAYWRIGHT_BROWSERS_PATH", raising=False)
+    tools.setup_browser_env()
+    assert os.environ["PLAYWRIGHT_BROWSERS_PATH"] == str(tmp_path / "ms-playwright")
+
+def test_setup_browser_env_falls_back_to_data_dir(monkeypatch, tmp_path):
+    import os
+    from trace_grabber import tools, paths
+    # No bundled ms-playwright in resource_dir => fall back to the data dir.
+    monkeypatch.setattr(paths, "is_frozen", lambda: True)
+    monkeypatch.setattr(paths, "resource_dir", lambda: tmp_path / "res")
+    monkeypatch.setattr(paths, "data_dir", lambda: tmp_path / "data")
+    monkeypatch.delenv("PLAYWRIGHT_BROWSERS_PATH", raising=False)
+    tools.setup_browser_env()
+    assert os.environ["PLAYWRIGHT_BROWSERS_PATH"] == str(tmp_path / "data" / "ms-playwright")
+
+def test_setup_browser_env_noop_in_dev(monkeypatch):
+    import os
+    from trace_grabber import tools, paths
+    monkeypatch.setattr(paths, "is_frozen", lambda: False)
+    monkeypatch.delenv("PLAYWRIGHT_BROWSERS_PATH", raising=False)
+    tools.setup_browser_env()
+    assert "PLAYWRIGHT_BROWSERS_PATH" not in os.environ
