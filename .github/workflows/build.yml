@@ -76,11 +76,16 @@ jobs:
           # PyInstaller's own signing left binaries ad-hoc / no-timestamp / no
           # hardened runtime (notarization rejected them). Sign every Mach-O
           # (dylibs, .so, bundled ffmpeg + node driver, the main exe) with a
-          # secure timestamp and hardened runtime, then seal the bundle with
-          # the entitlements (applied to the main executable).
+          # secure timestamp and hardened runtime — applying the entitlements to
+          # EACH one. The bundled Playwright "node" driver runs as its own
+          # process, and under the hardened runtime entitlements do not inherit
+          # from the parent: without allow-jit on node itself, V8 can't reserve
+          # its JIT CodeRange and node crashes on startup ("Failed to reserve
+          # virtual memory for CodeRange"), which silently breaks the app.
           while IFS= read -r f; do
             if file "$f" | grep -q "Mach-O"; then
-              codesign --force --timestamp --options runtime -s "$CODESIGN_IDENTITY" "$f"
+              codesign --force --timestamp --options runtime \
+                --entitlements "$ENT" -s "$CODESIGN_IDENTITY" "$f"
             fi
           done < <(find "$APP" -type f)
           codesign --force --timestamp --options runtime \
