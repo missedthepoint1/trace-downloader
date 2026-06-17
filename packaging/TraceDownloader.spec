@@ -18,6 +18,10 @@ if os.path.exists(os.path.join(ROOT, "assets", "icon.ico")):
     datas.append((os.path.join(ROOT, "assets", "icon.ico"), "assets"))
 binaries = [(os.path.join(ROOT, "bin", ffname), "bin")]
 
+ms_playwright = os.path.join(ROOT, "ms-playwright")
+if os.path.isdir(ms_playwright):
+    datas.append((ms_playwright, "ms-playwright"))
+
 hidden = ["trace_grabber", "gui", "platformdirs", "yaml"]
 for pkg in ("playwright", "webview"):
     d, b, h = collect_all(pkg)
