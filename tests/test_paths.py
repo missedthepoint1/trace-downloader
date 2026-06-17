@@ -42,6 +42,29 @@ def test_data_dir_falls_back_when_not_writable(monkeypatch, tmp_path):
     assert d == fallback / "TraceDown"
     assert d.exists()
 
+def test_data_dir_falls_back_when_probe_write_fails(monkeypatch, tmp_path):
+    import platformdirs
+    from pathlib import Path
+    from trace_grabber import paths
+    exe_dir = tmp_path / "app"; exe_dir.mkdir()
+    exe = exe_dir / "TraceDown"; exe.write_text("")
+    monkeypatch.setattr(paths.sys, "executable", str(exe))
+    monkeypatch.setattr(paths.sys, "platform", "win32")
+    monkeypatch.setattr(paths, "is_frozen", lambda: True)
+    fallback = tmp_path / "appdata"
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda name: str(fallback / name))
+
+    real_write_text = Path.write_text
+    def boom(self, *a, **k):
+        if self.name == ".write-test":
+            raise PermissionError("read-only")
+        return real_write_text(self, *a, **k)
+    monkeypatch.setattr(Path, "write_text", boom)
+
+    d = paths.data_dir()
+    assert d == fallback / "TraceDown"
+    assert d.exists()
+
 def test_data_dir_darwin_frozen_uses_platformdirs(monkeypatch, tmp_path):
     import platformdirs
     from trace_grabber import paths
