@@ -43,7 +43,7 @@ def setup_browser_env() -> None:
     if not paths.is_frozen():
         return
     bundled = paths.resource_dir() / "ms-playwright"
-    if bundled.exists():
+    if any(bundled.glob("chromium-*")):
         os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(bundled)
     else:
         os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(paths.data_dir() / "ms-playwright")

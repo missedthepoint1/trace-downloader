@@ -25,30 +25,40 @@ def test_subprocess_flags_non_windows(monkeypatch):
     assert tools.subprocess_flags() == {}
 
 def test_setup_browser_env_prefers_bundled(monkeypatch, tmp_path):
-    import os
     from trace_grabber import tools, paths
-    (tmp_path / "ms-playwright").mkdir()
+    env = {}
+    monkeypatch.setattr(tools.os, "environ", env)
+    (tmp_path / "ms-playwright" / "chromium-1234").mkdir(parents=True)
     monkeypatch.setattr(paths, "is_frozen", lambda: True)
     monkeypatch.setattr(paths, "resource_dir", lambda: tmp_path)
-    monkeypatch.delenv("PLAYWRIGHT_BROWSERS_PATH", raising=False)
     tools.setup_browser_env()
-    assert os.environ["PLAYWRIGHT_BROWSERS_PATH"] == str(tmp_path / "ms-playwright")
+    assert env["PLAYWRIGHT_BROWSERS_PATH"] == str(tmp_path / "ms-playwright")
 
 def test_setup_browser_env_falls_back_to_data_dir(monkeypatch, tmp_path):
-    import os
     from trace_grabber import tools, paths
-    # No bundled ms-playwright in resource_dir => fall back to the data dir.
+    env = {}
+    monkeypatch.setattr(tools.os, "environ", env)
     monkeypatch.setattr(paths, "is_frozen", lambda: True)
     monkeypatch.setattr(paths, "resource_dir", lambda: tmp_path / "res")
     monkeypatch.setattr(paths, "data_dir", lambda: tmp_path / "data")
-    monkeypatch.delenv("PLAYWRIGHT_BROWSERS_PATH", raising=False)
     tools.setup_browser_env()
-    assert os.environ["PLAYWRIGHT_BROWSERS_PATH"] == str(tmp_path / "data" / "ms-playwright")
+    assert env["PLAYWRIGHT_BROWSERS_PATH"] == str(tmp_path / "data" / "ms-playwright")
+
+def test_setup_browser_env_falls_back_when_bundle_empty(monkeypatch, tmp_path):
+    from trace_grabber import tools, paths
+    env = {}
+    monkeypatch.setattr(tools.os, "environ", env)
+    (tmp_path / "ms-playwright").mkdir()  # exists but has no chromium-* => not usable
+    monkeypatch.setattr(paths, "is_frozen", lambda: True)
+    monkeypatch.setattr(paths, "resource_dir", lambda: tmp_path)
+    monkeypatch.setattr(paths, "data_dir", lambda: tmp_path / "data")
+    tools.setup_browser_env()
+    assert env["PLAYWRIGHT_BROWSERS_PATH"] == str(tmp_path / "data" / "ms-playwright")
 
 def test_setup_browser_env_noop_in_dev(monkeypatch):
-    import os
     from trace_grabber import tools, paths
+    env = {}
+    monkeypatch.setattr(tools.os, "environ", env)
     monkeypatch.setattr(paths, "is_frozen", lambda: False)
-    monkeypatch.delenv("PLAYWRIGHT_BROWSERS_PATH", raising=False)
     tools.setup_browser_env()
-    assert "PLAYWRIGHT_BROWSERS_PATH" not in os.environ
+    assert "PLAYWRIGHT_BROWSERS_PATH" not in env
