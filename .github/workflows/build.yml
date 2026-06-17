@@ -25,7 +25,14 @@ jobs:
         run: python assets/make_icon.py
       - name: Fetch ffmpeg
         run: python packaging/fetch_ffmpeg.py
-      - name: Fetch Chromium (bundled)
+      - name: Fetch Chromium (bundled, Windows only)
+        # Bundled only on Windows: it removes the first-run download that pops a
+        # console window there. On macOS, PyInstaller ad-hoc-codesigns every
+        # bundled binary and chokes on Chromium's nested "Google Chrome for
+        # Testing.app", so macOS keeps the first-run download (no console issue
+        # on macOS). The spec's os.path.isdir("ms-playwright") guard skips
+        # bundling wherever this step didn't run.
+        if: runner.os == 'Windows'
         env:
           PLAYWRIGHT_BROWSERS_PATH: ms-playwright
         run: python -m playwright install chromium
