@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 from . import paths
+from . import tools
 
 PLIST_LABEL = "com.tracedownloader"
 LAUNCH_AGENT = Path.home() / "Library" / "LaunchAgents" / f"{PLIST_LABEL}.plist"
@@ -43,10 +44,10 @@ def _win_cmd_string():
 def _win_enable(interval_hours):
     subprocess.run(["schtasks", "/Create", "/F", "/SC", "HOURLY", "/MO",
                     str(interval_hours), "/TN", WIN_TASK, "/TR", _win_cmd_string()],
-                   check=False)
+                   check=False, **tools.subprocess_flags())
 
 def _win_disable():
-    subprocess.run(["schtasks", "/Delete", "/F", "/TN", WIN_TASK], check=False)
+    subprocess.run(["schtasks", "/Delete", "/F", "/TN", WIN_TASK], check=False, **tools.subprocess_flags())
 
 def schedule_enable(interval_hours: int = 3) -> None:
     if sys.platform == "darwin":
@@ -65,7 +66,7 @@ def schedule_enabled() -> bool:
         return LAUNCH_AGENT.exists()
     if os.name == "nt":
         r = subprocess.run(["schtasks", "/Query", "/TN", WIN_TASK],
-                           capture_output=True, text=True)
+                           capture_output=True, text=True, **tools.subprocess_flags())
         return r.returncode == 0
     return False
 
@@ -79,6 +80,6 @@ def notify(message: str) -> None:
             safe = message.replace("'", "")
             subprocess.run(["powershell", "-NoProfile", "-Command",
                 f"New-BurntToastNotification -Text 'TraceDown','{safe}'"],
-                check=False)
+                check=False, **tools.subprocess_flags())
     except Exception:
         pass

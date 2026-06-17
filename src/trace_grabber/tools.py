@@ -59,4 +59,4 @@ def install_chromium() -> None:
     driver = compute_driver_executable()
     args = list(driver) if isinstance(driver, (list, tuple)) else [driver]
     env = {**os.environ, **get_driver_env()}
-    subprocess.run([*args, "install", "chromium"], env=env, check=True)
+    subprocess.run([*args, "install", "chromium"], env=env, check=True, **subprocess_flags())
