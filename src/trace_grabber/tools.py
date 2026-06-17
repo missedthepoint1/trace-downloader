@@ -6,6 +6,17 @@ from pathlib import Path
 
 from . import paths
 
+def subprocess_flags() -> dict:
+    """Kwargs to keep child processes from popping a console window on Windows.
+
+    The frozen app is windowed (console=False); launching a console child
+    (node/ffmpeg) without this would allocate a visible console window.
+    CREATE_NO_WINDOW exists only on Windows, so it is referenced only there.
+    """
+    if os.name == "nt":
+        return {"creationflags": subprocess.CREATE_NO_WINDOW}
+    return {}
+
 def _ffmpeg_name() -> str:
     return "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
 
@@ -24,9 +35,17 @@ def ffmpeg_path() -> str:
     return "ffmpeg"
 
 def setup_browser_env() -> None:
-    """Point Playwright at a data-dir browsers folder only when frozen.
-    In dev we leave it alone so the existing OS cache is reused."""
-    if paths.is_frozen():
+    """Point Playwright at a bundled browsers folder when frozen.
+
+    Prefer Chromium bundled into the app (no first-run download, fully
+    portable). Fall back to the data dir (where install_chromium would put it)
+    if the bundle is missing. In dev, leave the OS cache alone."""
+    if not paths.is_frozen():
+        return
+    bundled = paths.resource_dir() / "ms-playwright"
+    if any(bundled.glob("chromium-*")):
+        os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(bundled)
+    else:
         os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(paths.data_dir() / "ms-playwright")
 
 def _browsers_path() -> Path:
@@ -48,4 +67,4 @@ def install_chromium() -> None:
     driver = compute_driver_executable()
     args = list(driver) if isinstance(driver, (list, tuple)) else [driver]
     env = {**os.environ, **get_driver_env()}
-    subprocess.run([*args, "install", "chromium"], env=env, check=True)
+    subprocess.run([*args, "install", "chromium"], env=env, check=True, **subprocess_flags())

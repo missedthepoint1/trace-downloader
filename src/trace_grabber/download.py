@@ -3,7 +3,7 @@ import time
 from pathlib import Path
 
 from .progress import parse_out_time, parse_total_size, percent
-from .tools import ffmpeg_path
+from .tools import ffmpeg_path, subprocess_flags
 
 def build_ffmpeg_cmd(m3u8_url: str, dest: Path, headers: dict[str, str],
                      stream_progress: bool = False) -> list[str]:
@@ -23,13 +23,13 @@ def download(m3u8_url: str, dest: Path, headers: dict[str, str],
     if progress_cb is None:
         cmd = build_ffmpeg_cmd(m3u8_url, dest, headers)
         cmd[0] = ffmpeg_path()
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, **subprocess_flags())
         if result.returncode != 0:
             raise RuntimeError(f"ffmpeg failed ({result.returncode}): {result.stderr[-500:]}")
         return
     cmd = build_ffmpeg_cmd(m3u8_url, dest, headers, stream_progress=True)
     cmd[0] = ffmpeg_path()
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, **subprocess_flags())
     if on_proc is not None:
         on_proc(proc)
     cur_size, cur_time = 0, 0.0

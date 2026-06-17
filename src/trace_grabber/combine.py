@@ -2,7 +2,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from .tools import ffmpeg_path
+from .tools import ffmpeg_path, subprocess_flags
 
 def build_concat_cmd(parts, dest, list_file):
     return [
@@ -25,7 +25,7 @@ def combine(parts, dest) -> None:
     try:
         cmd = build_concat_cmd(parts, dest, list_file)
         cmd[0] = ffmpeg_path()
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, **subprocess_flags())
         if result.returncode != 0:
             raise RuntimeError(f"combine failed ({result.returncode}): {result.stderr[-400:]}")
         if not dest.exists() or dest.stat().st_size == 0:

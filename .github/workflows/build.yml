@@ -25,6 +25,10 @@ jobs:
         run: python assets/make_icon.py
       - name: Fetch ffmpeg
         run: python packaging/fetch_ffmpeg.py
+      - name: Fetch Chromium (bundled)
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ms-playwright
+        run: python -m playwright install chromium
       - name: Build
         run: pyinstaller --noconfirm packaging/TraceDownloader.spec
       - name: Zip (macOS)
