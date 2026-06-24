@@ -10,8 +10,8 @@ from playwright.sync_api import sync_playwright
 from trace_grabber.config import load_config
 from trace_grabber import accounts as accts_mod
 from trace_grabber import paths
-from trace_grabber.session import is_logged_in, login_status, cookie_headers
-from trace_grabber.games import list_games, parse_games
+from trace_grabber.session import is_logged_in, login_status, api_logged_in, cookie_headers
+from trace_grabber.games import list_games
 from trace_grabber import streams, quality
 from trace_grabber.download import download
 from trace_grabber.naming import build_path
@@ -146,11 +146,11 @@ class Worker:
         if not acct or not acct.team_urls:
             self._login_detail = "no account / no team URL"
             return False
-        ok, detail = login_status(self._page, acct.team_urls[0])
-        try:
-            detail += f" cookies={len(self._ctx.cookies())} headless={self._headless}"
-        except Exception:
-            pass
+        # API check is instant and authoritative; only fall back to the DOM
+        # check (which can race the SPA) if the API itself is unreachable.
+        ok, detail = api_logged_in(self._ctx.request)
+        if not ok and detail.startswith("api unreachable"):
+            ok, detail = login_status(self._page, acct.team_urls[0])
         self._login_detail = detail
         LOG.info("login check: %s", detail)
         return ok
@@ -284,16 +284,20 @@ class Worker:
         teams = []
         for path in ids:
             url = BASE_URL + path
-            self._page.goto(url, wait_until="domcontentloaded")
+            # list_games waits for the games to actually render (and scrolls),
+            # so we don't grab the page before the SPA has loaded them.
             try:
-                self._page.wait_for_selector("a.GameLink.GameCard, h1", timeout=10000)
+                games = list_games(self._page, url)
             except Exception:
-                pass
-            games = parse_games(self._page.content())
-            label = games[0].title.split(" vs. ", 1)[0].strip() if games and " vs. " in games[0].title else None
+                games = []
+            label = (games[0].title.split(" vs. ", 1)[0].strip()
+                     if games and " vs. " in games[0].title else None)
             if not label:
-                h1 = self._page.query_selector("h1")
-                label = h1.inner_text().strip() if h1 else "Account"
+                try:
+                    h1 = self._page.query_selector("h1")
+                    label = h1.inner_text().strip() if h1 else "Account"
+                except Exception:
+                    label = "Account"
             teams.append((url, label))
         return teams
 
@@ -321,12 +325,10 @@ class Worker:
 
     def _confirm_team_url(self, url):
         url = url.strip().rstrip("/")
-        self._page.goto(url, wait_until="domcontentloaded")
         try:
-            self._page.wait_for_selector("a.GameLink.GameCard, h1", timeout=12000)
+            games = list_games(self._page, url)
         except Exception:
-            pass
-        games = parse_games(self._page.content())
+            games = []
         label = (games[0].title.split(" vs. ", 1)[0].strip()
                  if games and " vs. " in games[0].title else "Account")
         return self._finalize([url], label)

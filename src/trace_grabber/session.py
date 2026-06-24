@@ -1,7 +1,29 @@
-from playwright.sync_api import BrowserContext, Page
+from playwright.sync_api import APIRequestContext, BrowserContext, Page
 from . import selectors as S
 
 CARD_SELECTOR = "a.GameLink.GameCard"
+
+# Authoritative auth endpoint: returns the user when the session cookie is live,
+# {"success": false, "error": {"id": "user_not_logged_in"}} when it has lapsed.
+USERS_SELF_URL = "https://teams.traceup.com/webapp/users/self"
+
+def api_logged_in(request: APIRequestContext) -> tuple[bool, str]:
+    """Instant, reliable auth check via Trace's webapp API (shares the browser
+    context's session cookies). Preferred over waiting for the games SPA to
+    render — that wait races the page and reports false 'session expired'.
+    Returns (logged_in, human-readable detail)."""
+    try:
+        r = request.get(USERS_SELF_URL, timeout=12000)
+    except Exception as e:
+        return False, f"api unreachable: {e!r}"
+    try:
+        j = r.json()
+    except Exception:
+        return False, f"api http {r.status} (non-JSON)"
+    data = j.get("data") or {}
+    if j.get("success") and data.get("user_id"):
+        return True, f"logged in (user_id={data['user_id']})"
+    return False, (j.get("error") or {}).get("id") or "not logged in"
 
 def login_status(page: Page, team_url: str) -> tuple[bool, str]:
     """(logged_in, human-readable detail). Detail is for on-screen diagnostics
