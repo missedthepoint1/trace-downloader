@@ -204,10 +204,6 @@ el("removeAccount").onclick = async () => {
     await refresh();
   }
 };
-async function connectAccount() {
-  await addAccountFlow();
-  await refresh();
-}
 async function reconnectFlow() {
   await api().reconnect_start();
   const b = el("reconnect");
