@@ -4,9 +4,24 @@ const el = (id) => document.getElementById(id);
 async function refresh() {
   const s = await api().get_status();
   const st = el("status");
-  st.textContent = s.logged_in ? "Logged in" : "Session expired";
-  st.className = "status " + (s.logged_in ? "ok" : "bad");
-  el("reconnect").style.display = s.logged_in ? "none" : "inline-block";
+  const btn = el("reconnect");
+  const conn = s.connection || (s.logged_in ? "ok" : "expired");
+  if (conn === "ok") {
+    st.textContent = "Logged in"; st.className = "status ok";
+    btn.style.display = "none";
+  } else if (conn === "none") {
+    // Fresh install, no account yet — steer to Add account, not the dead-end
+    // Reconnect (which can't onboard a brand-new user).
+    st.textContent = "No account yet"; st.className = "status bad";
+    btn.style.display = "inline-block";
+    btn.textContent = "Connect Trace account";
+    btn.onclick = connectAccount;
+  } else {
+    st.textContent = "Session expired"; st.className = "status bad";
+    btn.style.display = "inline-block";
+    btn.textContent = "Reconnect";
+    btn.onclick = reconnectFlow;
+  }
   el("auto").checked = s.auto;
   if (s.settings) el("quality").value = s.settings.quality;
   if (s.settings) el("combine").checked = s.settings.combine !== false;
@@ -155,7 +170,11 @@ el("removeAccount").onclick = async () => {
     await refresh();
   }
 };
-el("reconnect").onclick = async () => {
+async function connectAccount() {
+  await addAccountFlow();
+  await refresh();
+}
+async function reconnectFlow() {
   await api().reconnect_start();
   const b = el("reconnect");
   b.textContent = "I've logged in →";
@@ -164,7 +183,7 @@ el("reconnect").onclick = async () => {
     await api().reconnect_finish();
     b.disabled = false; await refresh(); b.textContent = "Reconnect";
   };
-};
+}
 el("quality").onchange = (e) => api().save_settings({ quality: e.target.value });
 el("combine").onchange = (e) => api().save_settings({ combine: e.target.checked });
 // Run on first ready, and also if the API is already present (e.g. after a

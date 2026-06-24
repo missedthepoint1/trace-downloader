@@ -8,7 +8,7 @@ import webview
 import yaml
 
 from gui.worker import Worker
-from gui.viewmodel import games_view
+from gui.viewmodel import games_view, connection_state
 from trace_grabber import paths, platform_tasks
 from trace_grabber.config import load_config
 
@@ -34,8 +34,12 @@ class Api:
     def get_status(self):
         last = json.loads(LAST_RUN.read_text()) if LAST_RUN.exists() else None
         cfg = load_config(DATA / "config.yaml")
+        has_account = bool(self._w().list_accounts()["accounts"])
+        logged_in = self._w().logged_in()
         return {
-            "logged_in": self._w().logged_in(),
+            "logged_in": logged_in,
+            "has_account": has_account,
+            "connection": connection_state(has_account, logged_in),
             "last_run": last,
             "auto": platform_tasks.schedule_enabled(),
             "settings": {"output_dir": str(cfg.output_dir), "quality": cfg.quality, "combine": cfg.combine_halves},
