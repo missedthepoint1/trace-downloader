@@ -1,8 +1,8 @@
 # TraceDown
 
-A personal-use desktop app that downloads your own Trace game videos as 1080p MP4 files, directly to your Mac or Windows PC. You supply your own Trace subscription login — no third-party accounts, no cloud storage.
+A personal-use desktop app that downloads your own Trace game videos as 1080p MP4 files, directly to your Mac or Windows PC. You supply your own Trace subscription login. No third-party accounts, no cloud storage.
 
-Trace records each game in two halves. TraceDown downloads both and **automatically stitches them into a single, continuous MP4** — losslessly, with no re-encoding or quality loss — so you get one ready-to-watch file per game instead of two clips. The result is a standard MP4 you can **upload straight to YouTube** (or Hudl, Google Drive, etc.) with no extra editing or conversion.
+Trace records each game in two halves. TraceDown downloads both and **automatically stitches them into a single, continuous MP4**, losslessly, with no re-encoding or quality loss, so you get one ready-to-watch file per game instead of two clips. The result is a standard MP4 you can **upload straight to YouTube** (or Hudl, Google Drive, etc.) with no extra editing or conversion.
 
 <p align="center">
   <img src="assets/screenshot.png" alt="TraceDown app window" width="420">
@@ -17,9 +17,9 @@ Trace records each game in two halves. TraceDown downloads both and **automatica
 
 Go to the [**Releases**](../../releases/latest) page and download the zip for your platform:
 
-- `TraceDown-macOS-AppleSilicon.zip` — Mac (Apple Silicon: M1/M2/M3/M4)
-- `TraceDown-macOS-Intel.zip` — Mac (Intel)
-- `TraceDown-Windows.zip` — Windows (x64)
+- `TraceDown-macOS-AppleSilicon.zip` for Mac (Apple Silicon: M1/M2/M3/M4)
+- `TraceDown-macOS-Intel.zip` for Mac (Intel)
+- `TraceDown-Windows.zip` for Windows (x64)
 
 ---
 
@@ -27,9 +27,9 @@ Go to the [**Releases**](../../releases/latest) page and download the zip for yo
 
 ### macOS
 
-1. Unzip the download for your Mac (**Apple Silicon** for M1/M2/M3/M4, **Intel** otherwise — click  → *About This Mac* if unsure).
+1. Unzip the download for your Mac (**Apple Silicon** for M1/M2/M3/M4, **Intel** otherwise; click  → *About This Mac* if unsure).
 2. Drag **TraceDown** into your **Applications** folder.
-3. Double-click to open. The app is signed with a Developer ID and notarized by Apple, so it opens normally — no security workaround needed.
+3. Double-click to open. The app is signed with a Developer ID and notarized by Apple, so it opens normally, with no security workaround needed.
 
 ### Windows
 
@@ -41,7 +41,7 @@ Go to the [**Releases**](../../releases/latest) page and download the zip for yo
 
 ## First Launch
 
-On **macOS**, the first launch downloads the video engine (Chromium, ~170 MB, one time) — the **Windows** build already includes it. Once ready:
+On **macOS**, the first launch downloads the video engine (Chromium, ~170 MB, one time). The **Windows** build already includes it. Once ready:
 
 1. Click **+ Add account**.
 2. Log in with your Trace email address and the phone verification code.
@@ -51,7 +51,7 @@ On **macOS**, the first launch downloads the video engine (Chromium, ~170 MB, on
 
 ## Usage
 
-- Click a game to download it to your chosen output folder. Both halves are fetched and **automatically stitched into one continuous 1080p MP4** — the stitch is lossless (a direct stream copy, no re-encoding), and the separate half files are removed once the combined video is ready.
+- Click a game to download it to your chosen output folder. Both halves are fetched and **automatically stitched into one continuous 1080p MP4**. The stitch is lossless (a direct stream copy, no re-encoding), and the separate half files are removed once the combined video is ready.
 - Prefer the two halves as separate files? Turn off **Combine halves** in Settings.
 - Turn on **Auto-download** in Settings to automatically check for and download new games every 3 hours.
 
@@ -65,7 +65,7 @@ Before tagging, regenerate icons if the icon source changed:
 python assets/make_icon.py
 ```
 
-To publish a new release, tag and push — GitHub Actions builds both installers and attaches them to the Release automatically:
+To publish a new release, tag and push. GitHub Actions builds both installers and attaches them to the Release automatically:
 
 ```bash
 git tag v1.x
