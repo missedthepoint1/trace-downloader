@@ -146,20 +146,49 @@ window.onPy = (event, p) => {
 
 el("account").onchange = async (e) => {
   const v = e.target.value;
-  if (v === "__add__") { await addAccountFlow(); await refresh(); return; }
+  if (v === "__add__") { await connectAccount(); return; }
   await api().switch_account(v);
   await refresh();
 };
 
-async function addAccountFlow() {
+// ---- connect-account dialog (replaces fragile alert()/prompt(), which
+// WebView2 on Windows ignores) ----
+async function connectAccount() {
+  el("connectMsg").textContent = "";
+  el("connectManual").open = false;
+  el("connectUrl").value = "";
+  const b = el("connectDetect"); b.disabled = false; b.textContent = "Connect";
+  el("connect").showModal();
+  el("connectMsg").textContent = "Opening login window…";
   await api().add_account_start();
-  alert("A browser opened. Log into the OTHER Trace account (email + phone code), open your games, then click OK here.");
-  let res = await api().add_account_finish();
-  if (res && res.needs_url) {
-    const url = prompt("Couldn't auto-detect the team. Paste your team page URL (from go.traceup.com):", "https://go.traceup.com/traceid/team/");
-    if (url) await api().confirm_team_url(url);
-  }
+  el("connectMsg").textContent = "";
 }
+el("connectDetect").onclick = async () => {
+  const b = el("connectDetect"); b.disabled = true; b.textContent = "Connecting…";
+  el("connectMsg").textContent = "";
+  let res;
+  try { res = await api().add_account_finish(); } catch (err) { res = { detail: String(err) }; }
+  b.disabled = false; b.textContent = "Connect";
+  if (res && res.ok) { el("connect").close(); await refresh(); return; }
+  el("connectMsg").textContent = (res && res.detail ? res.detail : "Couldn't detect your team.")
+    + " — make sure you logged in via the TraceDown window, or paste your team URL below.";
+  el("connectManual").open = true;
+};
+el("connectUrlBtn").onclick = async () => {
+  const url = el("connectUrl").value.trim();
+  if (!url) { el("connectMsg").textContent = "Paste your team page URL first."; return; }
+  const b = el("connectUrlBtn"); b.disabled = true; b.textContent = "Connecting…";
+  let res;
+  try { res = await api().confirm_team_url(url); } catch (err) { res = { detail: String(err) }; }
+  b.disabled = false; b.textContent = "Use this URL";
+  if (res && res.ok) { el("connect").close(); await refresh(); return; }
+  el("connectMsg").textContent = (res && res.detail) ? res.detail : "That URL didn't work.";
+};
+el("connectCancel").onclick = async () => {
+  el("connect").close();
+  await api().add_account_cancel();
+  await refresh();
+};
 
 el("downloadAll").onclick = () => api().download_new();
 el("openFolder").onclick = () => api().open_folder();

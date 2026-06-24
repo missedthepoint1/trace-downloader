@@ -105,6 +105,10 @@ class Api:
     def add_account_finish(self):
         return self._w().add_account_finish()
 
+    def add_account_cancel(self):
+        self._w().add_account_cancel()
+        return {"ok": True}
+
     def confirm_team_url(self, url):
         return self._w().confirm_team_url(url)
 

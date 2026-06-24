@@ -1,5 +1,6 @@
 import logging
 import queue
+import re
 import threading
 import time
 from concurrent.futures import Future
@@ -93,6 +94,9 @@ class Worker:
 
     def add_account_finish(self):
         return self.submit(lambda: self._add_account_finish())
+
+    def add_account_cancel(self):
+        return self.submit(lambda: self._add_account_cancel())
 
     def confirm_team_url(self, url):
         return self.submit(lambda: self._confirm_team_url(url))
@@ -318,22 +322,50 @@ class Worker:
         return self._list_accounts()
 
     def _add_account_finish(self):
-        teams = self._detect_teams()
+        # Read where the login window currently is — surfaced in the UI so we
+        # can tell whether the user logged into OUR window (a Trace team page)
+        # or their own separate browser (which we can't see).
+        try:
+            cur_url = self._page.url
+            logged_in, _ = api_logged_in(self._ctx.request)
+            teams = self._detect_teams()
+        except Exception as e:
+            return {"needs_url": True,
+                    "detail": f"couldn't read the login window ({e!r}); paste your team URL"}
         if not teams:
-            return {"needs_url": True}
+            where = "not logged in" if not logged_in else f"on {cur_url}"
+            return {"needs_url": True,
+                    "detail": f"no team detected ({where})"}
         team_urls = [u for u, _ in teams]
         label = teams[0][1]
-        return self._finalize(team_urls, label)
+        self._finalize(team_urls, label)
+        return {"ok": True, "detail": f"connected: {label}"}
+
+    def _add_account_cancel(self):
+        try:
+            self._ctx.close()
+        except Exception:
+            pass
+        self._open_active()
+        return True
 
     def _confirm_team_url(self, url):
-        url = url.strip().rstrip("/")
+        # Normalize: accept a full URL or bare id, strip query/hash.
+        url = url.strip().split("?")[0].split("#")[0].rstrip("/")
+        m = re.search(r'/traceid/team/([a-z0-9]+)', url)
+        if not m and re.fullmatch(r'[a-z0-9]+', url):
+            url = f"{BASE_URL}/traceid/team/{url}"
+            m = True
+        if not m:
+            return {"needs_url": True, "detail": f"that doesn't look like a team URL: {url}"}
         try:
             games = list_games(self._page, url)
         except Exception:
             games = []
         label = (games[0].title.split(" vs. ", 1)[0].strip()
                  if games and " vs. " in games[0].title else "Account")
-        return self._finalize([url], label)
+        self._finalize([url], label)
+        return {"ok": True, "detail": f"connected: {label}"}
 
     # ---- reconnect flow (kept for compatibility) ----
     def _reconnect_start(self):

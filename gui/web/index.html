@@ -23,6 +23,22 @@
     <button id="openFolder">📁 Open folder</button>
     <button id="settingsBtn">⚙ Settings</button>
   </footer>
+  <dialog id="connect">
+    <h2>Connect your Trace account</h2>
+    <ol class="steps">
+      <li>A <b>TraceDown login window</b> just opened (a separate Chrome window). Use <b>that</b> window, not your normal browser.</li>
+      <li>Log into Trace there (email + phone code), then open your team's <b>Video / games</b> page.</li>
+      <li>Come back here and click <b>Connect</b>.</li>
+    </ol>
+    <button id="connectDetect" class="primary">Connect</button>
+    <div id="connectMsg"></div>
+    <details id="connectManual">
+      <summary>Auto-detect didn't work? Paste your team URL</summary>
+      <input id="connectUrl" type="text" placeholder="https://go.traceup.com/traceid/team/...">
+      <button id="connectUrlBtn">Use this URL</button>
+    </details>
+    <menu><button id="connectCancel">Cancel</button></menu>
+  </dialog>
   <dialog id="settings">
     <h2>Settings</h2>
     <label>Quality
