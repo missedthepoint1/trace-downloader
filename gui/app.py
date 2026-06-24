@@ -40,6 +40,7 @@ class Api:
             "logged_in": logged_in,
             "has_account": has_account,
             "connection": connection_state(has_account, logged_in),
+            "login_detail": self._w().login_detail(),
             "last_run": last,
             "auto": platform_tasks.schedule_enabled(),
             "settings": {"output_dir": str(cfg.output_dir), "quality": cfg.quality, "combine": cfg.combine_halves},

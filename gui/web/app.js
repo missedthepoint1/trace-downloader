@@ -22,6 +22,11 @@ async function refresh() {
     btn.textContent = "Reconnect";
     btn.onclick = reconnectFlow;
   }
+  const sd = el("statusDetail");
+  if (sd) {
+    sd.textContent = (conn !== "ok" && s.login_detail) ? ("Diagnostic: " + s.login_detail) : "";
+    st.title = s.login_detail || "";
+  }
   el("auto").checked = s.auto;
   if (s.settings) el("quality").value = s.settings.quality;
   if (s.settings) el("combine").checked = s.settings.combine !== false;

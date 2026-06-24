@@ -10,7 +10,7 @@ from playwright.sync_api import sync_playwright
 from trace_grabber.config import load_config
 from trace_grabber import accounts as accts_mod
 from trace_grabber import paths
-from trace_grabber.session import is_logged_in, cookie_headers
+from trace_grabber.session import is_logged_in, login_status, cookie_headers
 from trace_grabber.games import list_games, parse_games
 from trace_grabber import streams, quality
 from trace_grabber.download import download
@@ -33,6 +33,7 @@ class Worker:
         self._cancel = threading.Event()
         self._proc = None
         self._athlete_id = None
+        self._login_detail = ""  # last login-check detail, surfaced in the UI for diagnostics
         self._thumb_prefix = {}  # team_id -> working URL prefix, learned on first hit
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._started = threading.Event()
@@ -64,6 +65,9 @@ class Worker:
     # ---- public API ----
     def logged_in(self):
         return self.submit(lambda: self._logged_in())
+
+    def login_detail(self):
+        return self.submit(lambda: self._login_detail)
 
     def list_games(self):
         return self.submit(lambda: self._list_games())
@@ -104,6 +108,8 @@ class Worker:
     # ---- thread internals ----
 
     def _open_ctx(self, profile_dir: str, headless: bool):
+        self._headless = headless
+        self._profile_dir = profile_dir
         self._ctx = self._pw.chromium.launch_persistent_context(
             str(DATA / profile_dir), headless=headless)
         self._page = self._ctx.pages[0] if self._ctx.pages else self._ctx.new_page()
@@ -138,8 +144,16 @@ class Worker:
     def _logged_in(self):
         acct = self._active()
         if not acct or not acct.team_urls:
+            self._login_detail = "no account / no team URL"
             return False
-        return is_logged_in(self._page, acct.team_urls[0])
+        ok, detail = login_status(self._page, acct.team_urls[0])
+        try:
+            detail += f" cookies={len(self._ctx.cookies())} headless={self._headless}"
+        except Exception:
+            pass
+        self._login_detail = detail
+        LOG.info("login check: %s", detail)
+        return ok
 
     def _list_games(self):
         acct = self._active()
