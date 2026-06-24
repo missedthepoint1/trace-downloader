@@ -153,26 +153,54 @@ el("account").onchange = async (e) => {
 
 // ---- connect-account dialog (replaces fragile alert()/prompt(), which
 // WebView2 on Windows ignores) ----
+let connectTimer = null;
+function stopConnectPoll() { if (connectTimer) { clearInterval(connectTimer); connectTimer = null; } }
+
 async function connectAccount() {
-  el("connectMsg").textContent = "";
+  stopConnectPoll();
   el("connectManual").open = false;
   el("connectUrl").value = "";
-  const b = el("connectDetect"); b.disabled = false; b.textContent = "Connect";
+  const b = el("connectDetect"); b.disabled = false; b.textContent = "Connect now";
   el("connect").showModal();
   el("connectMsg").textContent = "Opening login window…";
-  await api().add_account_start();
-  el("connectMsg").textContent = "";
+  try {
+    await api().add_account_start();
+  } catch (err) {
+    el("connectMsg").textContent = "Couldn't open the login window: " + String(err);
+    return;
+  }
+  el("connectMsg").textContent = "Waiting for you to log in (email + code)…";
+  startConnectPoll();
 }
+
+// Poll the login window; the moment the session is live, the backend discovers
+// the team and finishes on its own — no need to open the games page or click.
+function startConnectPoll() {
+  stopConnectPoll();
+  connectTimer = setInterval(async () => {
+    let res;
+    try { res = await api().add_account_poll(); } catch (err) { return; }
+    if (!res) return;
+    if (res.status === "done") {
+      stopConnectPoll(); el("connect").close(); await refresh();
+    } else if (res.status === "logged_in_no_team" || res.status === "error") {
+      stopConnectPoll();
+      el("connectMsg").textContent = (res.detail || "Couldn't finish.")
+        + " You can paste your team URL below instead.";
+      el("connectManual").open = true;
+    }
+    // status === "waiting": keep polling, leave the message as-is
+  }, 2500);
+}
+
 el("connectDetect").onclick = async () => {
-  const b = el("connectDetect"); b.disabled = true; b.textContent = "Connecting…";
-  el("connectMsg").textContent = "";
+  const b = el("connectDetect"); b.disabled = true; b.textContent = "Checking…";
   let res;
   try { res = await api().add_account_finish(); } catch (err) { res = { detail: String(err) }; }
-  b.disabled = false; b.textContent = "Connect";
-  if (res && res.ok) { el("connect").close(); await refresh(); return; }
-  el("connectMsg").textContent = (res && res.detail ? res.detail : "Couldn't detect your team.")
-    + " — make sure you logged in via the TraceDown window, or paste your team URL below.";
-  el("connectManual").open = true;
+  b.disabled = false; b.textContent = "Connect now";
+  if (res && res.ok) { stopConnectPoll(); el("connect").close(); await refresh(); return; }
+  el("connectMsg").textContent = (res && res.detail) ? res.detail : "Not connected yet.";
+  if (res && res.needs_url) el("connectManual").open = true;
 };
 el("connectUrlBtn").onclick = async () => {
   const url = el("connectUrl").value.trim();
@@ -181,10 +209,11 @@ el("connectUrlBtn").onclick = async () => {
   let res;
   try { res = await api().confirm_team_url(url); } catch (err) { res = { detail: String(err) }; }
   b.disabled = false; b.textContent = "Use this URL";
-  if (res && res.ok) { el("connect").close(); await refresh(); return; }
+  if (res && res.ok) { stopConnectPoll(); el("connect").close(); await refresh(); return; }
   el("connectMsg").textContent = (res && res.detail) ? res.detail : "That URL didn't work.";
 };
 el("connectCancel").onclick = async () => {
+  stopConnectPoll();
   el("connect").close();
   await api().add_account_cancel();
   await refresh();

@@ -6,6 +6,25 @@ CARD_SELECTOR = "a.GameLink.GameCard"
 # Authoritative auth endpoint: returns the user when the session cookie is live,
 # {"success": false, "error": {"id": "user_not_logged_in"}} when it has lapsed.
 USERS_SELF_URL = "https://teams.traceup.com/webapp/users/self"
+# Lists the logged-in user's teams as JSON — lets us finish adding an account
+# straight after login, without the user navigating to their games page.
+USERS_SELF_TEAMS_URL = "https://teams.traceup.com/webapp/users/self/teams"
+
+def discover_teams(request: APIRequestContext) -> list[tuple[str, str]]:
+    """[(team_url, title)] for the logged-in user via the webapp API. Empty if
+    not logged in or the account coaches no teams."""
+    try:
+        j = request.get(USERS_SELF_TEAMS_URL, timeout=12000).json()
+    except Exception:
+        return []
+    if not j.get("success"):
+        return []
+    teams = []
+    for t in j.get("data") or []:
+        name = t.get("name")
+        if name:
+            teams.append((f"{S.BASE_URL}/traceid/team/{name}", t.get("title") or name))
+    return teams
 
 def api_logged_in(request: APIRequestContext) -> tuple[bool, str]:
     """Instant, reliable auth check via Trace's webapp API (shares the browser

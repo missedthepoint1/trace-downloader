@@ -105,6 +105,9 @@ class Api:
     def add_account_finish(self):
         return self._w().add_account_finish()
 
+    def add_account_poll(self):
+        return self._w().add_account_poll()
+
     def add_account_cancel(self):
         self._w().add_account_cancel()
         return {"ok": True}

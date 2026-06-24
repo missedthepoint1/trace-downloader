@@ -11,8 +11,8 @@ from playwright.sync_api import sync_playwright
 from trace_grabber.config import load_config
 from trace_grabber import accounts as accts_mod
 from trace_grabber import paths
-from trace_grabber.session import is_logged_in, login_status, api_logged_in, cookie_headers
-from trace_grabber import games as games_mod
+from trace_grabber.session import (is_logged_in, login_status, api_logged_in,
+                                    discover_teams, cookie_headers)
 from trace_grabber.games import list_games
 from trace_grabber import streams, quality
 from trace_grabber.download import download
@@ -94,6 +94,9 @@ class Worker:
 
     def add_account_finish(self):
         return self.submit(lambda: self._add_account_finish())
+
+    def add_account_poll(self):
+        return self.submit(lambda: self._add_account_poll())
 
     def add_account_cancel(self):
         return self.submit(lambda: self._add_account_cancel())
@@ -278,35 +281,6 @@ class Worker:
         self._page.goto("https://traceup.com", wait_until="domcontentloaded")
         return True
 
-    def _detect_teams(self):
-        """Return list of (team_url, label).
-
-        The user is told to open their games, so they're standing ON a team
-        page (…/traceid/team/<id>) — which doesn't link to itself. Read that id
-        straight from the current URL first (the reliable signal), then also
-        scrape any team links on the page for accounts that coach several teams.
-        """
-        ids = games_mod.team_paths(self._page.url, self._page.content())
-        teams = []
-        for path in ids:
-            url = BASE_URL + path
-            # list_games waits for the games to actually render (and scrolls),
-            # so we don't grab the page before the SPA has loaded them.
-            try:
-                games = list_games(self._page, url)
-            except Exception:
-                games = []
-            label = (games[0].title.split(" vs. ", 1)[0].strip()
-                     if games and " vs. " in games[0].title else None)
-            if not label:
-                try:
-                    h1 = self._page.query_selector("h1")
-                    label = h1.inner_text().strip() if h1 else "Account"
-                except Exception:
-                    label = "Account"
-            teams.append((url, label))
-        return teams
-
     def _finalize(self, team_urls, label):
         # move pending profile to a stable per-id dir
         acct_id = accts_mod.slugify(label) or f"account-{len(self._accounts.items)+1}"
@@ -321,25 +295,33 @@ class Worker:
         self._open_active()
         return self._list_accounts()
 
-    def _add_account_finish(self):
-        # Read where the login window currently is — surfaced in the UI so we
-        # can tell whether the user logged into OUR window (a Trace team page)
-        # or their own separate browser (which we can't see).
+    def _add_account_poll(self):
+        """Called repeatedly while the login window is open. As soon as the
+        session is live, discover the team(s) via the API and finish — the user
+        never has to leave the login page or click anything."""
         try:
-            cur_url = self._page.url
-            logged_in, _ = api_logged_in(self._ctx.request)
-            teams = self._detect_teams()
+            ok, _ = api_logged_in(self._ctx.request)
         except Exception as e:
-            return {"needs_url": True,
-                    "detail": f"couldn't read the login window ({e!r}); paste your team URL"}
+            return {"status": "error",
+                    "detail": f"the login window was closed ({e!r})"}
+        if not ok:
+            return {"status": "waiting"}
+        teams = discover_teams(self._ctx.request)
         if not teams:
-            where = "not logged in" if not logged_in else f"on {cur_url}"
-            return {"needs_url": True,
-                    "detail": f"no team detected ({where})"}
-        team_urls = [u for u, _ in teams]
-        label = teams[0][1]
-        self._finalize(team_urls, label)
-        return {"ok": True, "detail": f"connected: {label}"}
+            return {"status": "logged_in_no_team",
+                    "detail": "Logged in, but no team was found on this account."}
+        self._finalize([u for u, _ in teams], teams[0][1])
+        return {"status": "done", "detail": f"connected: {teams[0][1]}"}
+
+    def _add_account_finish(self):
+        """Manual 'Connect now' button — same API discovery, run on demand."""
+        res = self._add_account_poll()
+        if res.get("status") == "done":
+            return {"ok": True, "detail": res["detail"]}
+        if res.get("status") == "waiting":
+            return {"detail": "Not logged in yet — finish the email + code login "
+                              "in the TraceDown window, then it'll connect on its own."}
+        return {"needs_url": True, "detail": res.get("detail", "Couldn't detect your team.")}
 
     def _add_account_cancel(self):
         try:
