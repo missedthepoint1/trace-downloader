@@ -36,6 +36,22 @@ def _iso_date(text: str) -> str:
             continue
     return ""
 
+_TEAM_PATH_RE = re.compile(r'/traceid/team/([a-z0-9]+)')
+_TEAM_HREF_RE = re.compile(r'href="(/traceid/team/[a-z0-9]+)"')
+
+def team_paths(current_url: str, page_html: str) -> list[str]:
+    """Team page paths to consider when adding an account. The current URL (the
+    team the user has open) comes first — it's the reliable signal, since a team
+    page doesn't link to itself — then any team links found on the page."""
+    paths: list[str] = []
+    m = _TEAM_PATH_RE.search(current_url or "")
+    if m:
+        paths.append(f"/traceid/team/{m.group(1)}")
+    for href in _TEAM_HREF_RE.findall(page_html or ""):
+        if href not in paths:
+            paths.append(href)
+    return paths
+
 def parse_games(page_html: str) -> list[Game]:
     games: list[Game] = []
     seen: set[str] = set()

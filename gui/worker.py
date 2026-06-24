@@ -11,6 +11,7 @@ from trace_grabber.config import load_config
 from trace_grabber import accounts as accts_mod
 from trace_grabber import paths
 from trace_grabber.session import is_logged_in, login_status, api_logged_in, cookie_headers
+from trace_grabber import games as games_mod
 from trace_grabber.games import list_games
 from trace_grabber import streams, quality
 from trace_grabber.download import download
@@ -274,13 +275,14 @@ class Worker:
         return True
 
     def _detect_teams(self):
-        """Return list of (team_url, label). Scrapes /traceid/team/<id> links."""
-        import re
-        html = self._page.content()
-        ids = []
-        for m in re.findall(r'href="(/traceid/team/[a-z0-9]+)"', html):
-            if m not in ids:
-                ids.append(m)
+        """Return list of (team_url, label).
+
+        The user is told to open their games, so they're standing ON a team
+        page (…/traceid/team/<id>) — which doesn't link to itself. Read that id
+        straight from the current URL first (the reliable signal), then also
+        scrape any team links on the page for accounts that coach several teams.
+        """
+        ids = games_mod.team_paths(self._page.url, self._page.content())
         teams = []
         for path in ids:
             url = BASE_URL + path

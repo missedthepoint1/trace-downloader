@@ -1,5 +1,22 @@
 from pathlib import Path
-from trace_grabber.games import parse_games, Game
+from trace_grabber.games import parse_games, team_paths, Game
+
+
+def test_team_paths_uses_current_url_when_page_has_no_links():
+    # The user is standing on their team page, which doesn't link to itself.
+    url = "https://go.traceup.com/traceid/team/hjmwnzo2"
+    assert team_paths(url, "<html>no team links here</html>") == ["/traceid/team/hjmwnzo2"]
+
+
+def test_team_paths_current_url_first_then_links_deduped():
+    url = "https://go.traceup.com/traceid/team/aaa111"
+    html = 'x <a href="/traceid/team/aaa111">me</a> <a href="/traceid/team/bbb222">o</a>'
+    assert team_paths(url, html) == ["/traceid/team/aaa111", "/traceid/team/bbb222"]
+
+
+def test_team_paths_no_url_falls_back_to_links():
+    html = '<a href="/traceid/team/ccc333">t</a>'
+    assert team_paths("https://traceup.com/", html) == ["/traceid/team/ccc333"]
 
 FIXTURE = Path(__file__).parent / "fixtures" / "games_sample.html"
 
