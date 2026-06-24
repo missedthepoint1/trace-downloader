@@ -33,6 +33,7 @@ class Worker:
         self._cancel = threading.Event()
         self._proc = None
         self._athlete_id = None
+        self._thumb_prefix = {}  # team_id -> working URL prefix, learned on first hit
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._started = threading.Event()
         self._thread.start()
@@ -213,11 +214,17 @@ class Worker:
         Tries both URL prefixes (newer 'api', older 'us-east-2/soccer/api').
         """
         import base64
-        for prefix in streams.PREFIXES:
+        # Try the prefix that worked for this team first (saves up to 2 failing
+        # requests per game once the team's prefix is known).
+        cached = self._thumb_prefix.get(team_id)
+        order = ([cached] + [p for p in streams.PREFIXES if p != cached]
+                 if cached else streams.PREFIXES)
+        for prefix in order:
             url = f"{BASE_URL}/{prefix}/teams/{team_id}/games/{game_id}/poster.jpg"
             try:
                 r = self._ctx.request.get(url, timeout=12000)
                 if r.ok:
+                    self._thumb_prefix[team_id] = prefix
                     b64 = base64.b64encode(r.body()).decode("ascii")
                     return f"data:image/jpeg;base64,{b64}"
             except Exception:

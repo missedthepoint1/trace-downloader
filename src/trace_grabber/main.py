@@ -73,6 +73,8 @@ def run(mode: str = "new") -> int:
             acct = accounts.active
             if not acct:
                 print("no active account", file=sys.stderr); return 1
+            if not acct.team_urls:
+                print("active account has no team URL", file=sys.stderr); return 1
             ctx, page = _open(p, acct)
             try:
                 if not is_logged_in(page, acct.team_urls[0]):

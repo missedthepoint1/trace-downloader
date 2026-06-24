@@ -21,6 +21,7 @@ class Api:
     def __init__(self):
         self._worker = None
         self._window = None
+        self._game_cache = {}
 
     def _w(self):
         if self._worker is None:
@@ -43,11 +44,18 @@ class Api:
 
     def list_games(self):
         games, done = self._w().list_games()
+        # Cache the Game objects so a later download doesn't have to re-scrape
+        # the whole games page just to look up team_id/date/opponent.
+        self._game_cache = {g.id: g for g in games}
         return games_view(games, done)
 
     def _run_download(self, game_id):
-        games, _ = self._w().list_games()
-        g = next((x for x in games if x.id == game_id), None)
+        g = self._game_cache.get(game_id)
+        if g is None:
+            # Cache miss (e.g. game appeared since the last list) — refresh once.
+            games, _ = self._w().list_games()
+            self._game_cache = {x.id: x for x in games}
+            g = self._game_cache.get(game_id)
         if not g:
             return {"ok": False, "error": "game not found"}
 
