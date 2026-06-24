@@ -30,6 +30,10 @@ async function refresh() {
   el("auto").checked = s.auto;
   if (s.settings) el("quality").value = s.settings.quality;
   if (s.settings) el("combine").checked = s.settings.combine !== false;
+  if (s.settings && s.settings.output_dir) {
+    el("outDir").textContent = s.settings.output_dir;
+    el("outDir").title = s.settings.output_dir;
+  }
   el("version").textContent = "TraceDown v" + (s.version || "");
   await renderAccounts();
   const games = await api().list_games();
@@ -243,6 +247,15 @@ async function reconnectFlow() {
     b.disabled = false; await refresh(); b.textContent = "Reconnect";
   };
 }
+el("changeDir").onclick = async () => {
+  const b = el("changeDir"); b.disabled = true;
+  const res = await api().choose_output_dir();
+  b.disabled = false;
+  if (res && res.ok && res.output_dir) {
+    el("outDir").textContent = res.output_dir;
+    el("outDir").title = res.output_dir;
+  }
+};
 el("quality").onchange = (e) => api().save_settings({ quality: e.target.value });
 el("combine").onchange = (e) => api().save_settings({ combine: e.target.checked });
 // Run on first ready, and also if the API is already present (e.g. after a

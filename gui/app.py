@@ -147,6 +147,28 @@ class Api:
     def reconnect_finish(self):
         return {"logged_in": self._w().reconnect_finish()}
 
+    def choose_output_dir(self):
+        """Open a native folder picker and save the chosen download location."""
+        if not self._window:
+            return {"ok": False}
+        # FOLDER_DIALOG was renamed to FileDialog.FOLDER in newer pywebview.
+        folder = getattr(getattr(webview, "FileDialog", None), "FOLDER", None)
+        if folder is None:
+            folder = webview.FOLDER_DIALOG
+        try:
+            res = self._window.create_file_dialog(folder)
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+        if not res:
+            return {"ok": False}  # cancelled
+        path = res[0] if isinstance(res, (list, tuple)) else res
+        cfgpath = DATA / "config.yaml"
+        data = yaml.safe_load(cfgpath.read_text())
+        data["output_dir"] = path
+        cfgpath.write_text(yaml.safe_dump(data, sort_keys=False))
+        self._w().reload_config()
+        return {"ok": True, "output_dir": path}
+
     def save_settings(self, settings):
         path = DATA / "config.yaml"
         data = yaml.safe_load(path.read_text())
