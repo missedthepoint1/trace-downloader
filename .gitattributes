@@ -1,0 +1,17 @@
+# Normalize line endings on checkin; keep platform-native on checkout.
+* text=auto
+
+# Shell scripts and Python should always use LF.
+*.sh   text eol=lf
+*.py   text eol=lf
+
+# Windows batch/PowerShell use CRLF.
+*.bat  text eol=crlf
+*.ps1  text eol=crlf
+
+# Treat common binary assets as binary (no EOL munging, no diff).
+*.png  binary
+*.icns binary
+*.ico  binary
+*.zip  binary
+*.mp4  binary
