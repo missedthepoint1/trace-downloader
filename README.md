@@ -2,6 +2,8 @@
 
 A personal-use desktop app that downloads your own Trace game videos as 1080p MP4 files, directly to your Mac or Windows PC. You supply your own Trace subscription login — no third-party accounts, no cloud storage.
 
+Trace records each game in two halves. TraceDown downloads both and **automatically stitches them into a single, continuous MP4** — losslessly, with no re-encoding or quality loss — so you get one ready-to-watch file per game instead of two clips.
+
 <p align="center">
   <img src="assets/screenshot.png" alt="TraceDown app window" width="420">
 </p>
@@ -49,7 +51,8 @@ On **macOS**, the first launch downloads the video engine (Chromium, ~170 MB, on
 
 ## Usage
 
-- Click a game to download both halves (1080p MP4) to your chosen output folder.
+- Click a game to download it to your chosen output folder. Both halves are fetched and **automatically stitched into one continuous 1080p MP4** — the stitch is lossless (a direct stream copy, no re-encoding), and the separate half files are removed once the combined video is ready.
+- Prefer the two halves as separate files? Turn off **Combine halves** in Settings.
 - Turn on **Auto-download** in Settings to automatically check for and download new games every 3 hours.
 
 ---
